@@ -144,6 +144,25 @@ export default function HomeScreen({ navigation }) {
           ))}
         </View>
 
+        {/* Tour de France Pronostic Banner */}
+        <TouchableOpacity
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('TDFHome')}
+          style={styles.tdfBanner}
+        >
+          <LinearGradient
+            colors={['#FFCC00', '#FFD700']}
+            style={styles.tdfGradient}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Text style={styles.tdfEmoji}>🚴</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tdfTitle}>Tour de France — Pronostic</Text>
+              <Text style={styles.tdfSub}>☕ Café Op der Trap · Martelange</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#1A1A1A" />
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* Stats */}
         <View style={styles.statsBar}>
           {[
@@ -327,6 +346,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  tdfBanner: {
+    marginTop: 20,
+    marginBottom: 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#FFCC00',
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  tdfGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  tdfEmoji: { fontSize: 30 },
+  tdfTitle: { fontSize: 15, fontFamily: F.bold, color: '#1A1A1A', marginBottom: 2 },
+  tdfSub: { fontSize: 11, color: '#555' },
+
   statsBar: {
     marginTop: 20,
     backgroundColor: '#fff',
