@@ -9,19 +9,18 @@ import { CAFE_INFO, HORAIRES_SEMAINE } from '../../data/opderTrap/menuDuJour';
 import { getOpenStatus, todayHoursIndex } from '../../utils/openStatus';
 import { ODT } from '../../constants/brand';
 
-// Aperçu carte (OpenStreetMap, sans clé)
 const MAP_IMG =
   `https://staticmap.openstreetmap.de/staticmap.php?center=${CAFE_INFO.lat},${CAFE_INFO.lon}` +
   `&zoom=15&size=600x320&markers=${CAFE_INFO.lat},${CAFE_INFO.lon},red-pushpin`;
 
 export default function InfosScreen() {
-  const status = getOpenStatus();
+  const status   = getOpenStatus();
   const todayIdx = todayHoursIndex();
 
   const openMaps = () => {
     const q = encodeURIComponent(CAFE_INFO.adresseComplete);
     const url = Platform.select({
-      ios: `http://maps.apple.com/?q=${q}`,
+      ios:     `http://maps.apple.com/?q=${q}`,
       android: `geo:0,0?q=${q}`,
       default: `https://www.google.com/maps/search/?api=1&query=${q}`,
     });
@@ -30,7 +29,13 @@ export default function InfosScreen() {
     );
   };
 
-  const callPhone = () => Linking.openURL(`tel:${CAFE_INFO.telLien}`);
+  const callPhone  = () => Linking.openURL(`tel:${CAFE_INFO.telLien}`);
+  const openWA     = () => Linking.openURL(`https://wa.me/${CAFE_INFO.telLien}`);
+  const openEmail  = () => CAFE_INFO.email && Linking.openURL(`mailto:${CAFE_INFO.email}`);
+  const openFB     = () => CAFE_INFO.facebook && Linking.openURL(CAFE_INFO.facebook);
+  const openIG     = () => CAFE_INFO.instagram && Linking.openURL(CAFE_INFO.instagram);
+
+  const hasSocial = !!(CAFE_INFO.facebook || CAFE_INFO.instagram || CAFE_INFO.email);
 
   return (
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
@@ -86,19 +91,47 @@ export default function InfosScreen() {
             <Ionicons name="chevron-forward" size={18} color={ODT.gray} />
           </TouchableOpacity>
 
-          {/* Téléphone */}
-          <TouchableOpacity style={styles.row} onPress={callPhone} activeOpacity={0.7}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="call-outline" size={20} color={ODT.primary} />
+          {/* Contact : téléphone + WhatsApp sur la même ligne */}
+          <View style={styles.contactRow}>
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnPhone]} onPress={callPhone} activeOpacity={0.8}>
+              <Ionicons name="call" size={20} color="#fff" />
+              <View>
+                <Text style={styles.contactBtnLabel}>Appeler</Text>
+                <Text style={styles.contactBtnSub}>{CAFE_INFO.tel}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnWA]} onPress={openWA} activeOpacity={0.8}>
+              <Text style={styles.waIcon}>💬</Text>
+              <View>
+                <Text style={styles.contactBtnLabel}>WhatsApp</Text>
+                <Text style={styles.contactBtnSub}>Message direct</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Email + réseaux (uniquement si configurés) */}
+          {hasSocial && (
+            <View style={styles.socialRow}>
+              {!!CAFE_INFO.email && (
+                <TouchableOpacity style={styles.socialBtn} onPress={openEmail}>
+                  <Ionicons name="mail" size={22} color="#fff" />
+                  <Text style={styles.socialLabel}>E-mail</Text>
+                </TouchableOpacity>
+              )}
+              {!!CAFE_INFO.facebook && (
+                <TouchableOpacity style={[styles.socialBtn, styles.socialFB]} onPress={openFB}>
+                  <Text style={styles.socialIcon}>f</Text>
+                  <Text style={styles.socialLabel}>Facebook</Text>
+                </TouchableOpacity>
+              )}
+              {!!CAFE_INFO.instagram && (
+                <TouchableOpacity style={[styles.socialBtn, styles.socialIG]} onPress={openIG}>
+                  <Ionicons name="logo-instagram" size={22} color="#fff" />
+                  <Text style={styles.socialLabel}>Instagram</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowLabel}>Téléphone</Text>
-              <Text style={[styles.rowValue, { color: ODT.primary, fontWeight: '800' }]}>
-                {CAFE_INFO.tel}
-              </Text>
-            </View>
-            <Ionicons name="call" size={18} color={ODT.green} />
-          </TouchableOpacity>
+          )}
 
           {/* Horaires */}
           <View style={styles.hoursCard}>
@@ -155,15 +188,9 @@ const styles = StyleSheet.create({
   content: { padding: 16, marginTop: -16 },
 
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 22,
-    marginBottom: 14,
-    borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', alignSelf: 'center',
+    gap: 8, paddingHorizontal: 16, paddingVertical: 9,
+    borderRadius: 22, marginBottom: 14, borderWidth: 1.5,
   },
   statusOpen:   { backgroundColor: '#EAF7EE', borderColor: '#BFE6CB' },
   statusClosed: { backgroundColor: '#FDECEC', borderColor: '#F5C2C2' },
@@ -171,100 +198,82 @@ const styles = StyleSheet.create({
   statusText:   { fontSize: 13, fontWeight: '800' },
 
   mapCard: {
-    height: 180,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 14,
+    height: 180, borderRadius: 16, overflow: 'hidden', marginBottom: 14,
     backgroundColor: '#DDE3DA',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   mapImg: { width: '100%', height: '100%' },
-  mapPin: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -14,
-    marginTop: -28,
-  },
+  mapPin: { position: 'absolute', top: '50%', left: '50%', marginLeft: -14, marginTop: -28 },
   mapBtn: {
-    position: 'absolute',
-    bottom: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: ODT.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    position: 'absolute', bottom: 12, right: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: ODT.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
   },
   mapBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
 
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: ODT.white,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: ODT.white, borderRadius: 14, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   iconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#EAF5EC',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: '#EAF5EC', alignItems: 'center', justifyContent: 'center',
   },
   rowLabel: { fontSize: 12, color: ODT.gray, fontWeight: '700', marginBottom: 3 },
   rowValue: { fontSize: 14, color: ODT.dark, fontWeight: '600', lineHeight: 19 },
-  rowSub: { fontSize: 12, color: ODT.gray, marginTop: 2 },
+  rowSub:   { fontSize: 12, color: ODT.gray, marginTop: 2 },
 
+  // Contact phone + WhatsApp
+  contactRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  contactBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 14, padding: 14,
+    shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 3,
+  },
+  contactBtnPhone: { backgroundColor: ODT.primary },
+  contactBtnWA:    { backgroundColor: '#25D366' },
+  contactBtnLabel: { fontSize: 13, fontWeight: '800', color: '#fff' },
+  contactBtnSub:   { fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+  waIcon: { fontSize: 20 },
+
+  // Réseaux sociaux
+  socialRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  socialBtn: {
+    flex: 1, alignItems: 'center', gap: 6, paddingVertical: 14,
+    borderRadius: 14, backgroundColor: ODT.primary,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
+  },
+  socialFB:    { backgroundColor: '#1877F2' },
+  socialIG:    { backgroundColor: '#C13584' },
+  socialIcon:  { fontSize: 20, fontWeight: '900', color: '#fff' },
+  socialLabel: { fontSize: 11, fontWeight: '700', color: '#fff' },
+
+  // Horaires
   hoursCard: {
-    backgroundColor: ODT.white,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    backgroundColor: ODT.white, borderRadius: 14, padding: 16, marginBottom: 16,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   hoursHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  hoursTitle: { fontSize: 16, fontWeight: '800', color: ODT.dark },
+  hoursTitle:  { fontSize: 16, fontWeight: '800', color: ODT.dark },
   hourRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9 },
   hourRowBorder: { borderBottomWidth: 1, borderBottomColor: ODT.border },
   hourRowToday: {
-    backgroundColor: '#EAF5EC',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    marginHorizontal: -10,
-    borderBottomWidth: 0,
+    backgroundColor: '#EAF5EC', borderRadius: 10,
+    paddingHorizontal: 10, marginHorizontal: -10, borderBottomWidth: 0,
   },
-  hourDayWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  todayDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ODT.primary },
-  hourDay: { fontSize: 14, color: ODT.dark, fontWeight: '600' },
-  hourTime: { fontSize: 14, color: ODT.dark, fontWeight: '700' },
-  hourTodayText: { color: ODT.primary, fontWeight: '800' },
-  hourClosed: { color: ODT.red },
-
-  kitchenNote: {
-    marginTop: 12,
-    backgroundColor: ODT.cream,
-    borderRadius: 10,
-    padding: 12,
-  },
+  hourDayWrap:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  todayDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: ODT.primary },
+  hourDay:        { fontSize: 14, color: ODT.dark, fontWeight: '600' },
+  hourTime:       { fontSize: 14, color: ODT.dark, fontWeight: '700' },
+  hourTodayText:  { color: ODT.primary, fontWeight: '800' },
+  hourClosed:     { color: ODT.red },
+  kitchenNote: { marginTop: 12, backgroundColor: ODT.cream, borderRadius: 10, padding: 12 },
   kitchenText: { fontSize: 12, color: ODT.gray, lineHeight: 17 },
 
   footer: { textAlign: 'center', fontSize: 13, color: ODT.gray, fontStyle: 'italic', fontWeight: '600' },

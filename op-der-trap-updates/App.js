@@ -8,6 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { TDFProvider } from './src/context/TDFContext';
+import { ProfileProvider } from './src/context/ProfileContext';
 
 // Op der Trap screens
 import MenuScreen               from './src/screens/opderTrap/MenuScreen';
@@ -17,6 +18,7 @@ import BowlingReservationScreen from './src/screens/opderTrap/BowlingReservation
 import PronosticsScreen         from './src/screens/opderTrap/PronosticsScreen';
 import CarteScreen              from './src/screens/opderTrap/CarteScreen';
 import InfosScreen             from './src/screens/opderTrap/InfosScreen';
+import ProfileScreen           from './src/screens/opderTrap/ProfileScreen';
 
 // TDF screens (intégrés dans l'onglet Pronostics)
 import TDFHomeScreen         from './src/screens/tdf/TDFHomeScreen';
@@ -47,6 +49,7 @@ function MenuStack() {
     <SMenu.Navigator screenOptions={{ headerShown: false }}>
       <SMenu.Screen name="MenuMain"         component={MenuScreen} />
       <SMenu.Screen name="TableReservation" component={TableReservationScreen} />
+      <SMenu.Screen name="Profile"          component={ProfileScreen} />
     </SMenu.Navigator>
   );
 }
@@ -154,9 +157,11 @@ function AppContent() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <TDFProvider>
-        <AppContent />
-      </TDFProvider>
+      <ProfileProvider>
+        <TDFProvider>
+          <AppContent />
+        </TDFProvider>
+      </ProfileProvider>
     </SafeAreaProvider>
   );
 }

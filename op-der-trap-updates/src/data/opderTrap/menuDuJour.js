@@ -10,7 +10,9 @@ export const CAFE_INFO = {
   adresseComplete: '1, Rue des Tilleuls, 8832 Rombach-Martelange, Luxembourg',
   tel: '+352 23 640 626',
   telLien: '+35223640626',
-  // Coordonnées GPS (Rombach-Martelange)
+  email: '',          // ← à compléter si vous avez un email
+  facebook: '',       // ← ex: 'https://www.facebook.com/opdertrap'
+  instagram: '',      // ← ex: 'https://www.instagram.com/opdertrap'
   lat: 49.8369,
   lon: 5.7447,
 };

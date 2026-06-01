@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, StatusBar, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, StatusBar, Alert, KeyboardAvoidingView, Platform, Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
 import { FORMULES } from '../../data/opderTrap/menuDuJour';
+import { useProfile } from '../../context/ProfileContext';
 
 // Service du midi : un créneau toutes les 15 min entre 12h00 et 13h45
 const TIME_SLOTS = [
@@ -37,6 +38,7 @@ function getNextDays(n = 14) {
 
 export default function TableReservationScreen({ navigation, route }) {
   const days = getNextDays(14);
+  const { profile, hasProfile } = useProfile();
 
   // Jour pré-sélectionné depuis le menu (ex. "Mardi") → 1er jour correspondant
   const presetDay = route?.params?.dayName;
@@ -44,9 +46,17 @@ export default function TableReservationScreen({ navigation, route }) {
     ? Math.max(0, days.findIndex(d => d.day === presetDay.slice(0, 3)))
     : 0;
 
-  const [prenom, setPrenom] = useState('');
-  const [nom, setNom] = useState('');
-  const [phone, setPhone] = useState('');
+  const [prenom, setPrenom] = useState(profile.prenom);
+  const [nom, setNom] = useState(profile.nom);
+  const [phone, setPhone] = useState(profile.phone);
+
+  // Mise à jour si le profil se charge après le montage
+  useEffect(() => {
+    if (profile.prenom && !prenom) setPrenom(profile.prenom);
+    if (profile.nom   && !nom)    setNom(profile.nom);
+    if (profile.phone && !phone)  setPhone(profile.phone);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
   const [notes, setNotes] = useState('');
   const [selectedDay, setSelectedDay] = useState(presetIndex);
   const [selectedTime, setSelectedTime] = useState(null);
@@ -76,6 +86,7 @@ export default function TableReservationScreen({ navigation, route }) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      Vibration.vibrate([0, 80, 60, 120]); // feedback succès
       const ref = `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
       const recap = emporter

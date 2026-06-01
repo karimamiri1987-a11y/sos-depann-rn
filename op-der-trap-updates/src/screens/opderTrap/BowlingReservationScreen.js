@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, StatusBar, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, StatusBar, Alert, KeyboardAvoidingView, Platform, Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BOWLING } from '../../data/opderTrap/eventsData';
 import { ODT } from '../../constants/brand';
+import { useProfile } from '../../context/ProfileContext';
 
 const CYAN = '#0891B2';
 
@@ -34,8 +35,16 @@ function getNextDays(n = 14) {
 const DURATIONS = ['1h', '1h30', '2h', '3h'];
 
 export default function BowlingReservationScreen({ navigation }) {
-  const [nom, setNom] = useState('');
-  const [phone, setPhone] = useState('');
+  const { profile } = useProfile();
+  const [nom, setNom]     = useState(profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '');
+  const [phone, setPhone] = useState(profile.phone);
+
+  useEffect(() => {
+    const fullName = profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '';
+    if (fullName && !nom)  setNom(fullName);
+    if (profile.phone && !phone) setPhone(profile.phone);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
   const [selectedDay, setSelectedDay] = useState(0);
   const [selectedTime, setSelectedTime] = useState(null);
   const [players, setPlayers] = useState(4);
@@ -51,6 +60,7 @@ export default function BowlingReservationScreen({ navigation }) {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
+      Vibration.vibrate([0, 80, 60, 120]);
       const ref = `BOW-${Math.floor(10000 + Math.random() * 90000)}`;
       Alert.alert(
         '🎳 Réservation bowling confirmée !',

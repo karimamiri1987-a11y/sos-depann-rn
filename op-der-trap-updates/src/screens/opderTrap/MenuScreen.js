@@ -10,8 +10,13 @@ import {
   CAFE_INFO, HORAIRES, MENU_SEMAINE, PLATS_PERMANENTS, DESSERTS,
 } from '../../data/opderTrap/menuDuJour';
 import { ODT } from '../../constants/brand';
+import { getOpenStatus } from '../../utils/openStatus';
+import { useProfile } from '../../context/ProfileContext';
 
 export default function MenuScreen({ navigation }) {
+  const status = getOpenStatus();
+  const { profile, hasProfile } = useProfile();
+
   return (
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
       <StatusBar barStyle="light-content" backgroundColor={ODT.primary} />
@@ -28,8 +33,21 @@ export default function MenuScreen({ navigation }) {
                 <Text style={styles.dateText}>{CAFE_INFO.cp}</Text>
               </View>
             </View>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoEmoji}>🍽️</Text>
+            <View style={{ alignItems: 'flex-end', gap: 10 }}>
+              {/* Badge ouvert/fermé */}
+              <View style={[styles.openBadge, status.open ? styles.openBadgeGreen : styles.openBadgeRed]}>
+                <View style={[styles.openDot, { backgroundColor: status.open ? '#4ADE80' : '#F87171' }]} />
+                <Text style={[styles.openText, { color: status.open ? '#4ADE80' : '#F87171' }]}>
+                  {status.open ? 'Ouvert' : 'Fermé'}
+                </Text>
+              </View>
+              {/* Profil */}
+              <TouchableOpacity
+                style={styles.profileBtn}
+                onPress={() => navigation.navigate('Profile')}
+              >
+                <Ionicons name={hasProfile ? 'person-circle' : 'person-circle-outline'} size={28} color={hasProfile ? ODT.gold : 'rgba(255,255,255,0.7)'} />
+              </TouchableOpacity>
             </View>
           </View>
         </SafeAreaView>
@@ -185,15 +203,15 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 26, fontWeight: '800', color: '#fff', marginBottom: 6 },
   dateBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   dateText: { color: ODT.gold, fontSize: 13, fontWeight: '600' },
-  logoCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  openBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14,
   },
-  logoEmoji: { fontSize: 26 },
+  openBadgeGreen: { backgroundColor: 'rgba(74,222,128,0.18)' },
+  openBadgeRed:   { backgroundColor: 'rgba(248,113,113,0.18)' },
+  openDot: { width: 7, height: 7, borderRadius: 4 },
+  openText: { fontSize: 12, fontWeight: '800' },
+  profileBtn: { padding: 2 },
 
   content: { padding: 16 },
 

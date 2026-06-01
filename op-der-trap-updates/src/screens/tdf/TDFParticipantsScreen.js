@@ -5,10 +5,22 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTDF } from '../../context/TDFContext';
+import { useProfile } from '../../context/ProfileContext';
 
 export default function TDFParticipantsScreen({ navigation }) {
   const { participants, draw, isComplete, nbRequis, addParticipant, removeParticipant } = useTDF();
+  const { profile, hasProfile } = useProfile();
   const [name, setName] = useState('');
+
+  const profileName = profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '';
+  const alreadyRegistered = profileName
+    ? participants.some(p => p.name.toLowerCase() === profileName.toLowerCase())
+    : false;
+
+  const handleRegisterSelf = () => {
+    if (!profileName || alreadyRegistered || isFull) return;
+    addParticipant(profileName);
+  };
 
   const isFull = participants.length >= nbRequis;
 
@@ -59,6 +71,18 @@ export default function TDFParticipantsScreen({ navigation }) {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Inscription rapide via profil */}
+        {!isFull && hasProfile && !alreadyRegistered && (
+          <TouchableOpacity style={styles.selfRegisterBtn} onPress={handleRegisterSelf}>
+            <Text style={styles.selfRegisterText}>⚡ M'inscrire · {profileName}</Text>
+          </TouchableOpacity>
+        )}
+        {!isFull && hasProfile && alreadyRegistered && (
+          <View style={styles.selfRegisteredBox}>
+            <Text style={styles.selfRegisteredText}>✅ {profileName} est déjà inscrit(e)</Text>
+          </View>
+        )}
+
         {/* Add input */}
         {!isFull && (
           <View style={styles.inputRow}>
@@ -168,6 +192,22 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   countText: { color: '#FFCC00', fontWeight: '800', fontSize: 14 },
+
+  selfRegisterBtn: {
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: '#FFCC00', borderRadius: 12,
+    paddingVertical: 13, paddingHorizontal: 16, alignItems: 'center',
+    shadowColor: '#FFCC00', shadowOpacity: 0.35, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  selfRegisterText: { fontSize: 15, fontWeight: '800', color: '#1A1A1A' },
+  selfRegisteredBox: {
+    marginHorizontal: 16, marginBottom: 10,
+    backgroundColor: '#DCFCE7', borderRadius: 12,
+    paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: '#86EFAC',
+  },
+  selfRegisteredText: { fontSize: 13, fontWeight: '700', color: '#166534' },
 
   inputRow: {
     flexDirection: 'row',
