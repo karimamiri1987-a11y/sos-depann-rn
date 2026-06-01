@@ -1,10 +1,42 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 import { TDF_RIDERS, COUREURS_PAR_EQUIPE, RIDERS_BY_SLOT } from '../data/tdfRiders';
 
 const TDFContext = createContext();
 
-const KEY = 'tdf_state_v2';
+// Ancien stockage (limité à 2048 octets) — conservé pour migration.
+const LEGACY_KEY = 'tdf_state_v2';
+// Nouveau stockage : fichier JSON (aucune limite de taille).
+const FILE_URI = FileSystem.documentDirectory + 'tdf_state_v2.json';
+
+// Lecture du state persisté : fichier d'abord, puis migration SecureStore.
+async function loadState() {
+  try {
+    const info = await FileSystem.getInfoAsync(FILE_URI);
+    if (info.exists) {
+      const raw = await FileSystem.readAsStringAsync(FILE_URI);
+      return JSON.parse(raw);
+    }
+  } catch {}
+  // Migration depuis l'ancien SecureStore (données saisies avant la mise à jour).
+  try {
+    const raw = await SecureStore.getItemAsync(LEGACY_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      await FileSystem.writeAsStringAsync(FILE_URI, raw).catch(() => {});
+      await SecureStore.deleteItemAsync(LEGACY_KEY).catch(() => {});
+      return saved;
+    }
+  } catch {}
+  return null;
+}
+
+async function saveState(state) {
+  try {
+    await FileSystem.writeAsStringAsync(FILE_URI, JSON.stringify(state));
+  } catch {}
+}
 
 // Nombre de participants requis avant de pouvoir lancer le tirage
 export const NB_PARTICIPANTS_REQUIS = 23;
@@ -65,15 +97,12 @@ export function TDFProvider({ children }) {
   // Chargement de l'état persisté
   useEffect(() => {
     (async () => {
-      try {
-        const raw = await SecureStore.getItemAsync(KEY);
-        if (raw) {
-          const saved = JSON.parse(raw);
-          if (saved.participants?.length) setParticipants(saved.participants);
-          if (saved.draw) setDraw(saved.draw);
-          if (saved.stageResults) setStageResults(saved.stageResults);
-        }
-      } catch {}
+      const saved = await loadState();
+      if (saved) {
+        if (saved.participants?.length) setParticipants(saved.participants);
+        if (saved.draw) setDraw(saved.draw);
+        if (saved.stageResults) setStageResults(saved.stageResults);
+      }
       setLoaded(true);
     })();
   }, []);
@@ -81,7 +110,7 @@ export function TDFProvider({ children }) {
   // Sauvegarde à chaque changement
   useEffect(() => {
     if (!loaded) return;
-    SecureStore.setItemAsync(KEY, JSON.stringify({ participants, draw, stageResults })).catch(() => {});
+    saveState({ participants, draw, stageResults });
   }, [participants, draw, stageResults, loaded]);
 
   const addParticipant = useCallback((name) => {
