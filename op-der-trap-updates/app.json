@@ -45,11 +45,6 @@
           "enableBackgroundRemoteNotifications": false
         }
       ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "REMPLACER_PAR_VOTRE_PROJECT_ID"
-      }
-    }
+    ]
   }
 }
