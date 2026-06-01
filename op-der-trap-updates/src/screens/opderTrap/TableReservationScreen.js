@@ -36,7 +36,9 @@ export default function TableReservationScreen({ navigation }) {
   const [selectedTime, setSelectedTime] = useState(null);
   const [guests, setGuests] = useState(2);
   const [selectedFormule, setSelectedFormule] = useState(null);
+  const [mode, setMode] = useState('place'); // 'place' | 'emporter'
   const [loading, setLoading] = useState(false);
+  const emporter = mode === 'emporter';
 
   const days = getNextDays(14);
   const formuleObj = FORMULES.find(f => f.id === selectedFormule);
@@ -48,9 +50,12 @@ export default function TableReservationScreen({ navigation }) {
     setTimeout(() => {
       setLoading(false);
       const ref = `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
+      const recap = emporter
+        ? `Bonjour ${prenom} !\n\nVotre commande à emporter est enregistrée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ ${formuleObj ? formuleObj.name : ''}\n🥡 À emporter\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
+        : `Bonjour ${prenom} !\n\nVotre table pour ${guests} personne(s) est réservée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ ${formuleObj ? formuleObj.name : ''}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
       Alert.alert(
-        '✅ Réservation confirmée !',
-        `Bonjour ${prenom} !\n\nVotre table pour ${guests} personne(s) est réservée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ ${formuleObj ? formuleObj.name : ''}\n\nRéférence : ${ref}\n\nNous vous attendons !`,
+        emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
+        recap,
         [{ text: 'Parfait !', onPress: () => navigation.goBack() }]
       );
     }, 1200);
@@ -59,6 +64,8 @@ export default function TableReservationScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
       <StatusBar barStyle="light-content" backgroundColor={ODT.primary} />
+
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: ODT.primary }]}>
         <SafeAreaView edges={['top']}>
           <View style={styles.headerRow}>
@@ -74,6 +81,27 @@ export default function TableReservationScreen({ navigation }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
+          {/* Mode : sur place / à emporter */}
+          <View style={styles.modeRow}>
+            <TouchableOpacity
+              style={[styles.modeBtn, !emporter && styles.modeBtnActive]}
+              onPress={() => setMode('place')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="restaurant" size={18} color={!emporter ? '#fff' : ODT.primary} />
+              <Text style={[styles.modeText, !emporter && styles.modeTextActive]}>Sur place</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeBtn, emporter && styles.modeBtnActive]}
+              onPress={() => setMode('emporter')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="bag-handle" size={18} color={emporter ? '#fff' : ODT.primary} />
+              <Text style={[styles.modeText, emporter && styles.modeTextActive]}>À emporter</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Nom */}
           <View style={styles.card}>
             <Label icon="person-outline" text="Vos coordonnées" />
             <View style={styles.row}>
@@ -91,6 +119,7 @@ export default function TableReservationScreen({ navigation }) {
             <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="+352 xxx xxx xxx" keyboardType="phone-pad" maxLength={20} />
           </View>
 
+          {/* Date */}
           <View style={styles.card}>
             <Label icon="calendar-outline" text="Date" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -105,6 +134,7 @@ export default function TableReservationScreen({ navigation }) {
             </ScrollView>
           </View>
 
+          {/* Heure */}
           <View style={styles.card}>
             <Label icon="time-outline" text="Heure *" />
             <View style={styles.timeGrid}>
@@ -116,6 +146,7 @@ export default function TableReservationScreen({ navigation }) {
             </View>
           </View>
 
+          {/* Formule */}
           <View style={styles.card}>
             <Label icon="restaurant-outline" text="Votre formule *" />
             {FORMULES.map(f => {
@@ -134,6 +165,8 @@ export default function TableReservationScreen({ navigation }) {
             })}
           </View>
 
+          {/* Guests (sur place uniquement) */}
+          {!emporter && (
           <View style={styles.card}>
             <Label icon="people-outline" text="Nombre de personnes" />
             <View style={styles.stepperRow}>
@@ -147,15 +180,20 @@ export default function TableReservationScreen({ navigation }) {
               <Text style={styles.stepLabel}>personne{guests > 1 ? 's' : ''}</Text>
             </View>
           </View>
+          )}
 
+          {/* Notes */}
           <View style={styles.card}>
             <Label icon="chatbubble-outline" text="Notes (optionnel)" />
             <TextInput style={[styles.input, styles.notesInput]} value={notes} onChangeText={setNotes} placeholder="Allergie, occasion spéciale, chaise haute..." multiline numberOfLines={3} maxLength={200} />
           </View>
 
+          {/* Submit */}
           <TouchableOpacity style={[styles.submitBtn, (!isValid || loading) && styles.submitBtnDisabled]} onPress={handleSubmit} disabled={!isValid || loading}>
             <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.submitText}>{loading ? 'Réservation en cours...' : 'Confirmer la réservation'}</Text>
+            <Text style={styles.submitText}>
+              {loading ? 'Envoi en cours...' : emporter ? 'Confirmer la commande' : 'Confirmer la réservation'}
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.legalNote}>Réservation gratuite · Annulation possible jusqu'à 2h avant</Text>
@@ -215,4 +253,9 @@ const styles = StyleSheet.create({
   formuleName: { fontSize: 14, fontWeight: '700', color: ODT.dark, marginBottom: 2 },
   formuleDesc: { fontSize: 12, color: ODT.gray, lineHeight: 16 },
   formulePrice: { fontSize: 13, fontWeight: '800', color: ODT.green, marginTop: 3 },
+  modeRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5, borderColor: ODT.border, backgroundColor: ODT.white },
+  modeBtnActive: { backgroundColor: ODT.primary, borderColor: ODT.primary },
+  modeText: { fontSize: 14, fontWeight: '800', color: ODT.primary },
+  modeTextActive: { color: '#fff' },
 });

@@ -4,19 +4,37 @@ export const CAFE_INFO = {
   nom: 'Op der Trap',
   sousTitre: 'Bar & Vintage Bowling',
   adresse: '1, Rue des Tilleuls',
-  cp: 'L-8832 Rombach Martelange',
-  tel: '00352 23 640 626',
+  ville: 'Rombach-Martelange',
+  cp: 'L-8832',
+  pays: 'Luxembourg',
+  adresseComplete: '1, Rue des Tilleuls, 8832 Rombach-Martelange, Luxembourg',
+  tel: '+352 23 640 626',
   telLien: '+35223640626',
+  // Coordonnées GPS (Rombach-Martelange)
+  lat: 49.8369,
+  lon: 5.7447,
 };
 
 // Horaires de service
 export const HORAIRES = {
-  fermeture: 'Fermé tous les lundis',
+  ouverture: 'Mardi – Dimanche : 08h00 – 01h00',
+  fermeture: 'Fermé le lundi',
   menuJour: 'Menu du jour : du mardi au vendredi, 12h – 14h',
   spaghetti: 'Spaghetti : du mardi au vendredi, 12h – 14h',
   croque: 'Croque-monsieur : servi toute la journée',
   desserts: 'Coupes & desserts : du mardi au vendredi, 11h – 17h',
 };
+
+// Horaires détaillés (pour l'onglet Infos)
+export const HORAIRES_SEMAINE = [
+  { jour: 'Lundi',    heures: 'Fermé', ferme: true },
+  { jour: 'Mardi',    heures: '08h00 – 01h00', ferme: false },
+  { jour: 'Mercredi', heures: '08h00 – 01h00', ferme: false },
+  { jour: 'Jeudi',    heures: '08h00 – 01h00', ferme: false },
+  { jour: 'Vendredi', heures: '08h00 – 01h00', ferme: false },
+  { jour: 'Samedi',   heures: '08h00 – 01h00', ferme: false },
+  { jour: 'Dimanche', heures: '08h00 – 01h00', ferme: false },
+];
 
 // ─── Menu de la semaine (mardi → vendredi) ───────────────────────────────
 export const MENU_SEMAINE = [
@@ -56,17 +74,19 @@ export const PLATS_PERMANENTS = [
     id: 'spag',
     name: 'Spaghetti Bolognaise',
     desc: 'Servis du mardi au vendredi, de 12h à 14h',
+    price: '12,90 €',
     icon: '🍝',
   },
   {
     id: 'croque',
     name: 'Croque-Monsieur',
     desc: 'Servi toute la journée',
+    price: '6,50 €',
     icon: '🥪',
   },
 ];
 
-// ─── Carte des desserts ──────────────────────────────────────────────────
+// ─── Carte des desserts ────────────────────────────────────────────────
 export const DESSERTS = {
   suggestions: [
     {
@@ -130,14 +150,14 @@ export const FORMULES = [
     id: 'f_spag',
     name: 'Formule Spaghetti + Dessert du moment',
     desc: 'Spaghetti bolognaise et dessert du moment — 12h–14h',
-    price: null,
+    price: '18,90 €',
     icon: '🍝',
   },
   {
     id: 'f_spag_seul',
     name: 'Spaghetti seul',
     desc: 'Une assiette de spaghetti bolognaise — 12h–14h',
-    price: null,
+    price: '12,90 €',
     icon: '🍝',
   },
   {
