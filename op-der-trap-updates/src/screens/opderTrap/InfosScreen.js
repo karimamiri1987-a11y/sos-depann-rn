@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CAFE_INFO, HORAIRES_SEMAINE } from '../../data/opderTrap/menuDuJour';
+import { getOpenStatus, todayHoursIndex } from '../../utils/openStatus';
 import { ODT } from '../../constants/brand';
 
 // Aperçu carte (OpenStreetMap, sans clé)
@@ -14,6 +15,9 @@ const MAP_IMG =
   `&zoom=15&size=600x320&markers=${CAFE_INFO.lat},${CAFE_INFO.lon},red-pushpin`;
 
 export default function InfosScreen() {
+  const status = getOpenStatus();
+  const todayIdx = todayHoursIndex();
+
   const openMaps = () => {
     const q = encodeURIComponent(CAFE_INFO.adresseComplete);
     const url = Platform.select({
@@ -48,6 +52,14 @@ export default function InfosScreen() {
         </View>
 
         <View style={styles.content}>
+          {/* Statut d'ouverture en direct */}
+          <View style={[styles.statusBadge, status.open ? styles.statusOpen : styles.statusClosed]}>
+            <View style={[styles.statusDot, { backgroundColor: status.open ? ODT.green : ODT.red }]} />
+            <Text style={[styles.statusText, { color: status.open ? ODT.green : ODT.red }]}>
+              {status.label}
+            </Text>
+          </View>
+
           {/* Carte */}
           <TouchableOpacity style={styles.mapCard} onPress={openMaps} activeOpacity={0.9}>
             <Image source={{ uri: MAP_IMG }} style={styles.mapImg} resizeMode="cover" />
@@ -94,15 +106,29 @@ export default function InfosScreen() {
               <Ionicons name="time-outline" size={20} color={ODT.primary} />
               <Text style={styles.hoursTitle}>Heures d'ouverture</Text>
             </View>
-            {HORAIRES_SEMAINE.map((h, i) => (
-              <View
-                key={h.jour}
-                style={[styles.hourRow, i < HORAIRES_SEMAINE.length - 1 && styles.hourRowBorder]}
-              >
-                <Text style={[styles.hourDay, h.ferme && styles.hourClosed]}>{h.jour}</Text>
-                <Text style={[styles.hourTime, h.ferme && styles.hourClosed]}>{h.heures}</Text>
-              </View>
-            ))}
+            {HORAIRES_SEMAINE.map((h, i) => {
+              const isToday = i === todayIdx;
+              return (
+                <View
+                  key={h.jour}
+                  style={[
+                    styles.hourRow,
+                    i < HORAIRES_SEMAINE.length - 1 && styles.hourRowBorder,
+                    isToday && styles.hourRowToday,
+                  ]}
+                >
+                  <View style={styles.hourDayWrap}>
+                    {isToday && <View style={styles.todayDot} />}
+                    <Text style={[styles.hourDay, h.ferme && styles.hourClosed, isToday && styles.hourTodayText]}>
+                      {h.jour}
+                    </Text>
+                  </View>
+                  <Text style={[styles.hourTime, h.ferme && styles.hourClosed, isToday && styles.hourTodayText]}>
+                    {h.heures}
+                  </Text>
+                </View>
+              );
+            })}
             <View style={styles.kitchenNote}>
               <Text style={styles.kitchenText}>
                 🍽️ Cuisine : menu du jour & spaghetti du mardi au vendredi, 12h–14h ·
@@ -127,6 +153,22 @@ const styles = StyleSheet.create({
   logoBottom: { color: ODT.gold, fontSize: 12, fontWeight: '700', letterSpacing: 2, marginTop: 6 },
 
   content: { padding: 16, marginTop: -16 },
+
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 22,
+    marginBottom: 14,
+    borderWidth: 1.5,
+  },
+  statusOpen:   { backgroundColor: '#EAF7EE', borderColor: '#BFE6CB' },
+  statusClosed: { backgroundColor: '#FDECEC', borderColor: '#F5C2C2' },
+  statusDot:    { width: 9, height: 9, borderRadius: 5 },
+  statusText:   { fontSize: 13, fontWeight: '800' },
 
   mapCard: {
     height: 180,
@@ -201,10 +243,20 @@ const styles = StyleSheet.create({
   },
   hoursHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   hoursTitle: { fontSize: 16, fontWeight: '800', color: ODT.dark },
-  hourRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9 },
+  hourRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9 },
   hourRowBorder: { borderBottomWidth: 1, borderBottomColor: ODT.border },
+  hourRowToday: {
+    backgroundColor: '#EAF5EC',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    marginHorizontal: -10,
+    borderBottomWidth: 0,
+  },
+  hourDayWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  todayDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: ODT.primary },
   hourDay: { fontSize: 14, color: ODT.dark, fontWeight: '600' },
   hourTime: { fontSize: 14, color: ODT.dark, fontWeight: '700' },
+  hourTodayText: { color: ODT.primary, fontWeight: '800' },
   hourClosed: { color: ODT.red },
 
   kitchenNote: {
