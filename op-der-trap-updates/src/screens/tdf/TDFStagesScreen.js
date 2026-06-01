@@ -120,6 +120,7 @@ export default function TDFStagesScreen({ navigation }) {
                     </Text>
                   </View>
                   <Text style={styles.stageKm}>{stage.km} km</Text>
+                  {stage.date && <Text style={styles.stageDate}>· {stage.date}</Text>}
                 </View>
                 {done && (
                   <View style={styles.resultRow}>
@@ -320,6 +321,7 @@ const styles = StyleSheet.create({
   typeChip: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
   typeText: { fontSize: 10, fontWeight: '700' },
   stageKm: { fontSize: 11, color: '#888' },
+  stageDate: { fontSize: 11, color: '#aaa', fontWeight: '600' },
   resultRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 },
   resultChip: { fontSize: 11, color: '#555', fontWeight: '600' },
   chevron: { fontSize: 14, color: '#aaa' },
