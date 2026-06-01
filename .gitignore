@@ -39,4 +39,3 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-op-der-trap/node_modules/
