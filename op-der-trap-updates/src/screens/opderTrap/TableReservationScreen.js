@@ -57,8 +57,19 @@ export default function TableReservationScreen({ navigation, route }) {
       ? Math.max(0, days.findIndex(d => d.day === presetDay.slice(0, 3)))
       : 0;
 
-  const [prenom, setPrenom] = useState(editRes ? (editRes.prenom || '') : profile.prenom);
-  const [nom, setNom] = useState(editRes ? (editRes.nom || '') : profile.nom);
+  const [prenom, setPrenom] = useState(() => {
+    if (!editRes) return profile.prenom;
+    if (editRes.prenom) return editRes.prenom;
+    // ancienne réservation : découper le champ « name » sur le 1er espace
+    const spaceIdx = (editRes.name || '').indexOf(' ');
+    return spaceIdx >= 0 ? editRes.name.slice(0, spaceIdx) : (editRes.name || '');
+  });
+  const [nom, setNom] = useState(() => {
+    if (!editRes) return profile.nom;
+    if (editRes.nom) return editRes.nom;
+    const spaceIdx = (editRes.name || '').indexOf(' ');
+    return spaceIdx >= 0 ? editRes.name.slice(spaceIdx + 1) : '';
+  });
   const [phone, setPhone] = useState(editRes ? editRes.phone : profile.phone);
 
   // Mise à jour si le profil se charge après le montage (sauf en édition)
