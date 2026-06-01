@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BOWLING } from '../../data/opderTrap/eventsData';
 import { ODT } from '../../constants/brand';
 import { useProfile } from '../../context/ProfileContext';
+import { useReservations } from '../../context/ReservationsContext';
 
 const CYAN = '#0891B2';
 
@@ -36,6 +37,7 @@ const DURATIONS = ['1h', '1h30', '2h', '3h'];
 
 export default function BowlingReservationScreen({ navigation }) {
   const { profile } = useProfile();
+  const { addReservation } = useReservations();
   const [nom, setNom]     = useState(profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '');
   const [phone, setPhone] = useState(profile.phone);
 
@@ -67,6 +69,17 @@ export default function BowlingReservationScreen({ navigation }) {
       setLoading(false);
       Vibration.vibrate([0, 80, 60, 120]);
       const ref = `BOW-${Math.floor(10000 + Math.random() * 90000)}`;
+      addReservation({
+        type: 'bowling',
+        ref,
+        dayLabel: days[selectedDay].label,
+        time: selectedTime,
+        name: nom,
+        phone,
+        players,
+        duration,
+        total: total.toFixed(0),
+      });
       Alert.alert(
         '🎳 Réservation bowling confirmée !',
         `Bonjour ${nom} !\n\n📅 ${days[selectedDay].label} à ${selectedTime}\n👥 ${players} joueur(s)\n⏱️ ${duration}\n💶 ~${total.toFixed(0)}€ estimé\n\nRéférence : ${ref}\n\nÀ vos quilles !`,

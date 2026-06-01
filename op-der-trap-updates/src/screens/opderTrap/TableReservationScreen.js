@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
 import { FORMULES } from '../../data/opderTrap/menuDuJour';
 import { useProfile } from '../../context/ProfileContext';
+import { useReservations } from '../../context/ReservationsContext';
 
 // Service du midi : un créneau toutes les 15 min entre 12h00 et 13h45
 const TIME_SLOTS = [
@@ -39,6 +40,7 @@ function getNextDays(n = 14) {
 export default function TableReservationScreen({ navigation, route }) {
   const days = getNextDays(14);
   const { profile, hasProfile } = useProfile();
+  const { addReservation } = useReservations();
 
   // Jour pré-sélectionné depuis le menu (ex. "Mardi") → 1er jour correspondant
   const presetDay = route?.params?.dayName;
@@ -99,9 +101,23 @@ export default function TableReservationScreen({ navigation, route }) {
       const ref = `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
       const notesText = notes.trim() ? `\n📝 ${notes.trim()}` : '';
+      const guestsLine = !emporter && guests > 0 ? `\n👥 ${guests} personne(s)` : '';
       const recap = emporter
         ? `Bonjour ${prenom} !\n\nVotre commande à emporter est enregistrée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter${notesText}\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
-        : `Bonjour ${prenom} !\n\nVotre table pour ${guests} personne(s) est réservée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
+        : `Bonjour ${prenom} !\n\nVotre table est réservée :${guestsLine}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
+      addReservation({
+        type: 'table',
+        ref,
+        dayLabel: days[selectedDay].label,
+        time: selectedTime,
+        name: `${prenom} ${nom}`.trim(),
+        phone,
+        guests: emporter ? 0 : guests,
+        mode,
+        items: selectedItems.map(f => ({ name: f.name, qty: f.qty })),
+        totalStr,
+        notes: notes.trim(),
+      });
       Alert.alert(
         emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
         recap,
@@ -277,7 +293,7 @@ export default function TableReservationScreen({ navigation, route }) {
           {/* Guests (sur place uniquement) */}
           {!emporter && (
           <View style={styles.card}>
-            <Label icon="people-outline" text="Nombre de personnes" />
+            <Label icon="people-outline" text="Nombre de personnes (optionnel)" />
             <View style={styles.stepperRow}>
               <TouchableOpacity
                 style={[styles.stepBtn, guests <= 1 && styles.stepBtnDisabled]}

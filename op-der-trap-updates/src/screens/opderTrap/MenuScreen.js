@@ -12,10 +12,13 @@ import {
 import { ODT } from '../../constants/brand';
 import { getOpenStatus } from '../../utils/openStatus';
 import { useProfile } from '../../context/ProfileContext';
+import { useReservations } from '../../context/ReservationsContext';
 
 export default function MenuScreen({ navigation }) {
   const status = getOpenStatus();
   const { profile, hasProfile } = useProfile();
+  const { reservations } = useReservations();
+  const activeCount = reservations.filter(r => r.status !== 'cancelled').length;
 
   return (
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
@@ -125,6 +128,22 @@ export default function MenuScreen({ navigation }) {
             </View>
           ))}
         </View>
+
+        {/* Mes réservations */}
+        <TouchableOpacity
+          style={styles.reservationsBtn}
+          onPress={() => navigation.navigate('Reservations')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="receipt-outline" size={20} color={ODT.primary} />
+          <Text style={styles.reservationsBtnText}>Mes réservations</Text>
+          {activeCount > 0 && (
+            <View style={styles.reservationsBadge}>
+              <Text style={styles.reservationsBadgeText}>{activeCount}</Text>
+            </View>
+          )}
+          <Ionicons name="chevron-forward" size={16} color={ODT.gray} />
+        </TouchableOpacity>
 
         {/* Reservation CTA */}
         <TouchableOpacity
@@ -295,6 +314,34 @@ const styles = StyleSheet.create({
   permIcon: { fontSize: 26 },
   permName: { fontSize: 15, fontWeight: '700', color: ODT.dark, marginBottom: 2 },
   permDesc: { fontSize: 12, color: ODT.gray, lineHeight: 16 },
+
+  reservationsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: ODT.white,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: ODT.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  reservationsBtnText: { flex: 1, fontSize: 15, fontWeight: '700', color: ODT.dark },
+  reservationsBadge: {
+    backgroundColor: ODT.primary,
+    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  reservationsBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
 
   ctaBtn: {
     borderRadius: 16,
