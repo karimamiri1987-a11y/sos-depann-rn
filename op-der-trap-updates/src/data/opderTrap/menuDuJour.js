@@ -74,19 +74,17 @@ export const PLATS_PERMANENTS = [
     id: 'spag',
     name: 'Spaghetti Bolognaise',
     desc: 'Servis du mardi au vendredi, de 12h à 14h',
-    price: '12,90 €',
     icon: '🍝',
   },
   {
     id: 'croque',
     name: 'Croque-Monsieur',
     desc: 'Servi toute la journée',
-    price: '6,50 €',
     icon: '🥪',
   },
 ];
 
-// ─── Carte des desserts ────────────────────────────────────────────────
+// ─── Carte des desserts ──────────────────────────────────────────────────
 export const DESSERTS = {
   suggestions: [
     {
@@ -131,6 +129,7 @@ export const DESSERTS = {
 };
 
 // ─── Formules proposées à la réservation ─────────────────────────────────
+// (prix non communiqués — à compléter)
 export const FORMULES = [
   {
     id: 'f_menu',
