@@ -1,100 +1,116 @@
-import { useFonts, DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
-import { SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useEffect, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
-import { requestNotificationPermissions } from './src/services/NotificationService';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
-import { AppProvider } from './src/context/AppContext';
 import { TDFProvider } from './src/context/TDFContext';
-import SplashScreen from './src/screens/SplashScreen';
-import HomeScreen from './src/screens/HomeScreen';
-import TDFHomeScreen from './src/screens/tdf/TDFHomeScreen';
-import TDFParticipantsScreen from './src/screens/tdf/TDFParticipantsScreen';
-import TDFDrawScreen from './src/screens/tdf/TDFDrawScreen';
-import TDFStagesScreen from './src/screens/tdf/TDFStagesScreen';
-import TDFLeaderboardScreen from './src/screens/tdf/TDFLeaderboardScreen';
-import DiagnosticScreen from './src/screens/DiagnosticScreen';
-import SearchingScreen from './src/screens/SearchingScreen';
-import ProAlertScreen from './src/screens/ProAlertScreen';
-import DepositConfirmedScreen from './src/screens/DepositConfirmedScreen';
-import ProDashboardScreen from './src/screens/ProDashboardScreen';
-import ProAuthScreen from './src/screens/ProAuthScreen';
-import UserProfileScreen from './src/screens/UserProfileScreen';
-import ProProfileScreen from './src/screens/ProProfileScreen';
-import ProRequestScreen from './src/screens/ProRequestScreen';
 
-const Stack = createNativeStackNavigator();
+// Op der Trap screens
+import MenuScreen            from './src/screens/opderTrap/MenuScreen';
+import TableReservationScreen from './src/screens/opderTrap/TableReservationScreen';
+import EvenementsScreen      from './src/screens/opderTrap/EvenementsScreen';
+import BowlingReservationScreen from './src/screens/opderTrap/BowlingReservationScreen';
+import PronosticsScreen      from './src/screens/opderTrap/PronosticsScreen';
+import CarteScreen           from './src/screens/opderTrap/CarteScreen';
+
+// TDF screens
+import TDFHomeScreen         from './src/screens/tdf/TDFHomeScreen';
+import TDFParticipantsScreen from './src/screens/tdf/TDFParticipantsScreen';
+import TDFDrawScreen         from './src/screens/tdf/TDFDrawScreen';
+import TDFStagesScreen       from './src/screens/tdf/TDFStagesScreen';
+import TDFLeaderboardScreen  from './src/screens/tdf/TDFLeaderboardScreen';
+
+const Tab    = createBottomTabNavigator();
+const SMenu  = createNativeStackNavigator();
+const SEvt   = createNativeStackNavigator();
+const SPron  = createNativeStackNavigator();
+const SCarte = createNativeStackNavigator();
+
+const PRIMARY = '#1B3A2D';
+const GOLD    = '#C9A84C';
+
+function MenuStack() {
+  return (
+    <SMenu.Navigator screenOptions={{ headerShown: false }}>
+      <SMenu.Screen name="MenuMain"          component={MenuScreen} />
+      <SMenu.Screen name="TableReservation"  component={TableReservationScreen} />
+    </SMenu.Navigator>
+  );
+}
+
+function EvenementsStack() {
+  return (
+    <SEvt.Navigator screenOptions={{ headerShown: false }}>
+      <SEvt.Screen name="EvenementsMain"      component={EvenementsScreen} />
+      <SEvt.Screen name="BowlingReservation"  component={BowlingReservationScreen} />
+    </SEvt.Navigator>
+  );
+}
+
+function PronosticsStack() {
+  return (
+    <SPron.Navigator screenOptions={{ headerShown: false }}>
+      <SPron.Screen name="PronosticsMain"   component={PronosticsScreen} />
+      <SPron.Screen name="TDFHome"          component={TDFHomeScreen} />
+      <SPron.Screen name="TDFParticipants"  component={TDFParticipantsScreen} />
+      <SPron.Screen name="TDFDraw"          component={TDFDrawScreen} />
+      <SPron.Screen name="TDFStages"        component={TDFStagesScreen} />
+      <SPron.Screen name="TDFLeaderboard"   component={TDFLeaderboardScreen} />
+    </SPron.Navigator>
+  );
+}
+
+function CarteStack() {
+  return (
+    <SCarte.Navigator screenOptions={{ headerShown: false }}>
+      <SCarte.Screen name="CarteMain" component={CarteScreen} />
+    </SCarte.Navigator>
+  );
+}
+
+const TAB_ICONS = {
+  'Menu':        { active: 'restaurant',     inactive: 'restaurant-outline'  },
+  'Événements':  { active: 'calendar',       inactive: 'calendar-outline'    },
+  'Pronostics':  { active: 'trophy',         inactive: 'trophy-outline'      },
+  'Carte':       { active: 'book',           inactive: 'book-outline'        },
+};
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
-    DMSans_700Bold,
-    SpaceGrotesk_600SemiBold,
-    SpaceGrotesk_700Bold,
-  });
-
-  const navigationRef = useRef(null);
-
-  useEffect(() => {
-    // Demander les permissions dès le démarrage
-    requestNotificationPermissions();
-
-    // Listener : tap sur notification quand app en arrière-plan
-    const sub = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data;
-      if ((data?.type === 'pro_request' || data?.type === 'pro_reminder') && navigationRef.current) {
-        navigationRef.current.navigate('ProRequest', {
-          catId: data.catId || 'plomberie',
-          urgencyId: data.urgencyId || 'express',
-          deposit: data.deposit || 60,
-          clientLocation: data.clientLocation || '12 Rue de la Paix, Paris',
-        });
-      }
-    });
-
-    return () => sub.remove();
-  }, []);
-
-  if (!fontsLoaded) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
-        <ActivityIndicator color="#0891B2" size="large" />
-      </View>
-    );
-  }
-
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <TDFProvider>
-        <NavigationContainer ref={navigationRef}>
-          <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
-            <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="TDFHome" component={TDFHomeScreen} />
-            <Stack.Screen name="TDFParticipants" component={TDFParticipantsScreen} />
-            <Stack.Screen name="TDFDraw" component={TDFDrawScreen} />
-            <Stack.Screen name="TDFStages" component={TDFStagesScreen} />
-            <Stack.Screen name="TDFLeaderboard" component={TDFLeaderboardScreen} />
-            <Stack.Screen name="Diagnostic" component={DiagnosticScreen} />
-            <Stack.Screen name="Searching" component={SearchingScreen} options={{ gestureEnabled: false }} />
-            <Stack.Screen name="ProAlert" component={ProAlertScreen} options={{ gestureEnabled: false }} />
-            <Stack.Screen name="DepositConfirmed" component={DepositConfirmedScreen} options={{ gestureEnabled: false }} />
-            <Stack.Screen name="ProAuth" component={ProAuthScreen} />
-            <Stack.Screen name="ProRequest" component={ProRequestScreen} options={{ gestureEnabled: false, animation: 'fade' }} />
-            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-            <Stack.Screen name="ProProfile" component={ProProfileScreen} />
-            <Stack.Screen name="ProDashboard" component={ProDashboardScreen} />
-          </Stack.Navigator>
+      <TDFProvider>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              headerShown: false,
+              tabBarActiveTintColor: PRIMARY,
+              tabBarInactiveTintColor: '#9CA3AF',
+              tabBarStyle: {
+                backgroundColor: '#FFFFFF',
+                borderTopColor: '#E8E0D8',
+                borderTopWidth: 1,
+                paddingBottom: 8,
+                paddingTop: 6,
+                height: 62,
+              },
+              tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+              tabBarIcon: ({ focused, color }) => {
+                const icons = TAB_ICONS[route.name];
+                const name  = icons ? (focused ? icons.active : icons.inactive) : 'ellipse';
+                return <Ionicons name={name} size={22} color={color} />;
+              },
+            })}
+          >
+            <Tab.Screen name="Menu"        component={MenuStack}        options={{ title: 'Menu' }} />
+            <Tab.Screen name="Événements"  component={EvenementsStack}  options={{ title: 'Événements' }} />
+            <Tab.Screen name="Pronostics"  component={PronosticsStack}  options={{ title: 'Pronostics' }} />
+            <Tab.Screen name="Carte"       component={CarteStack}       options={{ title: 'Carte' }} />
+          </Tab.Navigator>
         </NavigationContainer>
-        </TDFProvider>
-      </AppProvider>
+      </TDFProvider>
     </SafeAreaProvider>
   );
 }
