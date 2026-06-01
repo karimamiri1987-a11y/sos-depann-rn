@@ -28,9 +28,19 @@ function getNextDays(n = 14) {
       short: d.getDate().toString(),
       day: JOURS[d.getDay()],
       label: `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}`,
+      dateISO: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
     });
   }
   return out;
+}
+
+// Combine une date (YYYY-MM-DD) et une heure (HH:MM) en datetime ISO local.
+function computeWhenISO(dateISO, time) {
+  if (!dateISO || !time) return null;
+  const [hh, mm] = time.split(':').map(Number);
+  const d = new Date(`${dateISO}T00:00:00`);
+  d.setHours(hh, mm, 0, 0);
+  return d.toISOString();
 }
 
 const DURATIONS = ['1h', '1h30', '2h', '3h'];
@@ -84,6 +94,7 @@ export default function BowlingReservationScreen({ navigation, route }) {
         ref,
         dayLabel: days[selectedDay].label,
         time: selectedTime,
+        whenISO: computeWhenISO(days[selectedDay].dateISO, selectedTime),
         name: nom,
         phone,
         players,

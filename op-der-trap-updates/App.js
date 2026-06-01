@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import { View, PanResponder } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TDFProvider } from './src/context/TDFContext';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { ReservationsProvider } from './src/context/ReservationsContext';
+import { initNotifications } from './src/utils/notifications';
 
 // Op der Trap screens
 import MenuScreen               from './src/screens/opderTrap/MenuScreen';
@@ -92,6 +93,9 @@ function CarteStack() {
 function AppContent() {
   const insets = useSafeAreaInsets();
   const navigationRef = useRef(null);
+
+  // Initialise les notifications (handler + canal Android) au démarrage.
+  useEffect(() => { initNotifications(); }, []);
 
   // Swipe gauche/droite pour changer d'onglet.
   // Le geste doit être nettement horizontal (dx > 3× dy) pour ne pas

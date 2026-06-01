@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
+import { scheduleReservationReminders, cancelReminders } from '../utils/notifications';
 
 const ReservationsContext = createContext(null);
 const FILE_URI = FileSystem.documentDirectory + 'reservations.json';
@@ -7,6 +8,10 @@ const FILE_URI = FileSystem.documentDirectory + 'reservations.json';
 export function ReservationsProvider({ children }) {
   const [reservations, setReservations] = useState([]);
   const [loaded, setLoaded] = useState(false);
+
+  // Miroir synchrone pour lire les notifIds sans dépendances stale.
+  const resRef = useRef([]);
+  useEffect(() => { resRef.current = reservations; }, [reservations]);
 
   useEffect(() => {
     (async () => {
@@ -28,6 +33,16 @@ export function ReservationsProvider({ children }) {
     } catch {}
   }, []);
 
+  // Met à jour les notifIds d'une réservation après planification asynchrone.
+  const attachNotifIds = useCallback((id, ids) => {
+    if (!ids || !ids.length) return;
+    setReservations(prev => {
+      const updated = prev.map(r => r.id === id ? { ...r, notifIds: ids } : r);
+      persist(updated);
+      return updated;
+    });
+  }, [persist]);
+
   const addReservation = useCallback((data) => {
     const entry = {
       id: `R-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -40,28 +55,43 @@ export function ReservationsProvider({ children }) {
       persist(updated);
       return updated;
     });
+    // Programmer les rappels (asynchrone, sans bloquer).
+    scheduleReservationReminders(entry)
+      .then(ids => attachNotifIds(entry.id, ids))
+      .catch(() => {});
     return entry.id;
-  }, [persist]);
+  }, [persist, attachNotifIds]);
 
-  const cancelReservation = useCallback((id) => {
+  const updateReservation = useCallback((id, data) => {
+    const existing = resRef.current.find(r => r.id === id);
+    // Annuler les anciens rappels.
+    if (existing?.notifIds) cancelReminders(existing.notifIds);
+
+    const merged = { ...existing, ...data, updatedAt: new Date().toISOString(), notifIds: [] };
     setReservations(prev => {
-      const updated = prev.map(r => r.id === id ? { ...r, status: 'cancelled' } : r);
+      const updated = prev.map(r => r.id === id ? merged : r);
       persist(updated);
       return updated;
     });
-  }, [persist]);
+    // Reprogrammer les rappels avec les nouvelles infos.
+    scheduleReservationReminders(merged)
+      .then(ids => attachNotifIds(id, ids))
+      .catch(() => {});
+  }, [persist, attachNotifIds]);
 
-  const updateReservation = useCallback((id, data) => {
+  const cancelReservation = useCallback((id) => {
+    const existing = resRef.current.find(r => r.id === id);
+    if (existing?.notifIds) cancelReminders(existing.notifIds);
     setReservations(prev => {
-      const updated = prev.map(r =>
-        r.id === id ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
-      );
+      const updated = prev.map(r => r.id === id ? { ...r, status: 'cancelled', notifIds: [] } : r);
       persist(updated);
       return updated;
     });
   }, [persist]);
 
   const deleteReservation = useCallback((id) => {
+    const existing = resRef.current.find(r => r.id === id);
+    if (existing?.notifIds) cancelReminders(existing.notifIds);
     setReservations(prev => {
       const updated = prev.filter(r => r.id !== id);
       persist(updated);
