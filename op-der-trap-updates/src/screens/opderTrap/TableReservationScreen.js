@@ -40,31 +40,41 @@ function getNextDays(n = 14) {
 export default function TableReservationScreen({ navigation, route }) {
   const days = getNextDays(14);
   const { profile, hasProfile } = useProfile();
-  const { addReservation } = useReservations();
+  const { addReservation, updateReservation } = useReservations();
 
-  // Jour pré-sélectionné depuis le menu (ex. "Mardi") → 1er jour correspondant
+  // Réservation à modifier (depuis « Mes réservations »)
+  const editRes = route?.params?.edit || null;
+  const isEdit = !!editRes;
+
+  // Jour pré-sélectionné : depuis l'édition, sinon depuis le menu (ex. "Mardi")
   const presetDay = route?.params?.dayName;
-  const presetIndex = presetDay
-    ? Math.max(0, days.findIndex(d => d.day === presetDay.slice(0, 3)))
-    : 0;
+  const editDayIndex = editRes
+    ? Math.max(0, days.findIndex(d => d.label === editRes.dayLabel))
+    : -1;
+  const presetIndex = editDayIndex >= 0
+    ? editDayIndex
+    : presetDay
+      ? Math.max(0, days.findIndex(d => d.day === presetDay.slice(0, 3)))
+      : 0;
 
-  const [prenom, setPrenom] = useState(profile.prenom);
-  const [nom, setNom] = useState(profile.nom);
-  const [phone, setPhone] = useState(profile.phone);
+  const [prenom, setPrenom] = useState(editRes ? (editRes.prenom || '') : profile.prenom);
+  const [nom, setNom] = useState(editRes ? (editRes.nom || '') : profile.nom);
+  const [phone, setPhone] = useState(editRes ? editRes.phone : profile.phone);
 
-  // Mise à jour si le profil se charge après le montage
+  // Mise à jour si le profil se charge après le montage (sauf en édition)
   useEffect(() => {
+    if (isEdit) return;
     if (profile.prenom && !prenom) setPrenom(profile.prenom);
     if (profile.nom   && !nom)    setNom(profile.nom);
     if (profile.phone && !phone)  setPhone(profile.phone);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(editRes ? (editRes.notes || '') : '');
   const [selectedDay, setSelectedDay] = useState(presetIndex);
-  const [selectedTime, setSelectedTime] = useState(null);
-  const [guests, setGuests] = useState(2);
-  const [quantities, setQuantities] = useState({}); // { [formuleId]: nombre }
-  const [mode, setMode] = useState('place'); // 'place' | 'emporter'
+  const [selectedTime, setSelectedTime] = useState(editRes ? editRes.time : null);
+  const [guests, setGuests] = useState(editRes && editRes.guests > 0 ? editRes.guests : 2);
+  const [quantities, setQuantities] = useState(editRes && editRes.quantities ? editRes.quantities : {}); // { [formuleId]: nombre }
+  const [mode, setMode] = useState(editRes ? (editRes.mode || 'place') : 'place'); // 'place' | 'emporter'
   const [loading, setLoading] = useState(false);
   const emporter = mode === 'emporter';
 
@@ -98,28 +108,38 @@ export default function TableReservationScreen({ navigation, route }) {
     setTimeout(() => {
       setLoading(false);
       Vibration.vibrate([0, 80, 60, 120]); // feedback succès
-      const ref = `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
+      const ref = isEdit ? editRes.ref : `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
       const notesText = notes.trim() ? `\n📝 ${notes.trim()}` : '';
       const guestsLine = !emporter && guests > 0 ? `\n👥 ${guests} personne(s)` : '';
+      const intro = isEdit
+        ? `Bonjour ${prenom} !\n\nVotre réservation a bien été modifiée :`
+        : emporter
+          ? `Bonjour ${prenom} !\n\nVotre commande à emporter est enregistrée :`
+          : `Bonjour ${prenom} !\n\nVotre table est réservée :`;
       const recap = emporter
-        ? `Bonjour ${prenom} !\n\nVotre commande à emporter est enregistrée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter${notesText}\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
-        : `Bonjour ${prenom} !\n\nVotre table est réservée :${guestsLine}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
-      addReservation({
+        ? `${intro}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter${notesText}\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
+        : `${intro}${guestsLine}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
+      const payload = {
         type: 'table',
         ref,
         dayLabel: days[selectedDay].label,
         time: selectedTime,
         name: `${prenom} ${nom}`.trim(),
+        prenom,
+        nom,
         phone,
         guests: emporter ? 0 : guests,
         mode,
+        quantities,
         items: selectedItems.map(f => ({ name: f.name, qty: f.qty })),
         totalStr,
         notes: notes.trim(),
-      });
+      };
+      if (isEdit) updateReservation(editRes.id, payload);
+      else addReservation(payload);
       Alert.alert(
-        emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
+        isEdit ? '✅ Réservation modifiée !' : emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
         recap,
         [{ text: 'Parfait !', onPress: () => navigation.goBack() }]
       );
@@ -137,7 +157,7 @@ export default function TableReservationScreen({ navigation, route }) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Réserver une table</Text>
+            <Text style={styles.headerTitle}>{isEdit ? 'Modifier la réservation' : 'Réserver une table'}</Text>
             <View style={{ width: 38 }} />
           </View>
         </SafeAreaView>
@@ -370,7 +390,7 @@ export default function TableReservationScreen({ navigation, route }) {
                 color="#fff"
               />
               <Text style={styles.summaryBtnText}>
-                {loading ? 'Envoi...' : emporter ? 'Commander' : 'Réserver'}
+                {loading ? 'Envoi...' : isEdit ? 'Enregistrer' : emporter ? 'Commander' : 'Réserver'}
               </Text>
             </TouchableOpacity>
           </View>

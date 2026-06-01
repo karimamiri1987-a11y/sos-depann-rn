@@ -51,6 +51,16 @@ export function ReservationsProvider({ children }) {
     });
   }, [persist]);
 
+  const updateReservation = useCallback((id, data) => {
+    setReservations(prev => {
+      const updated = prev.map(r =>
+        r.id === id ? { ...r, ...data, updatedAt: new Date().toISOString() } : r
+      );
+      persist(updated);
+      return updated;
+    });
+  }, [persist]);
+
   const deleteReservation = useCallback((id) => {
     setReservations(prev => {
       const updated = prev.filter(r => r.id !== id);
@@ -60,7 +70,7 @@ export function ReservationsProvider({ children }) {
   }, [persist]);
 
   return (
-    <ReservationsContext.Provider value={{ reservations, addReservation, cancelReservation, deleteReservation, loaded }}>
+    <ReservationsContext.Provider value={{ reservations, addReservation, updateReservation, cancelReservation, deleteReservation, loaded }}>
       {children}
     </ReservationsContext.Provider>
   );

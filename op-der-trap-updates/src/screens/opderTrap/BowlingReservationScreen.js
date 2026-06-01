@@ -35,25 +35,35 @@ function getNextDays(n = 14) {
 
 const DURATIONS = ['1h', '1h30', '2h', '3h'];
 
-export default function BowlingReservationScreen({ navigation }) {
+export default function BowlingReservationScreen({ navigation, route }) {
   const { profile } = useProfile();
-  const { addReservation } = useReservations();
-  const [nom, setNom]     = useState(profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '');
-  const [phone, setPhone] = useState(profile.phone);
+  const { addReservation, updateReservation } = useReservations();
+
+  const editRes = route?.params?.edit || null;
+  const isEdit = !!editRes;
+
+  const days = getNextDays(14);
+  const editDayIndex = editRes
+    ? Math.max(0, days.findIndex(d => d.label === editRes.dayLabel))
+    : 0;
+
+  const [nom, setNom]     = useState(
+    editRes ? editRes.name : (profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '')
+  );
+  const [phone, setPhone] = useState(editRes ? editRes.phone : profile.phone);
 
   useEffect(() => {
+    if (isEdit) return;
     const fullName = profile.prenom ? `${profile.prenom} ${profile.nom}`.trim() : '';
     if (fullName && !nom)  setNom(fullName);
     if (profile.phone && !phone) setPhone(profile.phone);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
-  const [selectedDay, setSelectedDay] = useState(0);
-  const [selectedTime, setSelectedTime] = useState(null);
-  const [players, setPlayers] = useState(4);
-  const [duration, setDuration] = useState('1h');
+  const [selectedDay, setSelectedDay] = useState(editDayIndex);
+  const [selectedTime, setSelectedTime] = useState(editRes ? editRes.time : null);
+  const [players, setPlayers] = useState(editRes ? editRes.players : 4);
+  const [duration, setDuration] = useState(editRes ? editRes.duration : '1h');
   const [loading, setLoading] = useState(false);
-
-  const days = getNextDays(14);
   const isValid = nom.trim() && phone.trim() && selectedTime;
 
   const missing = [];
@@ -68,8 +78,8 @@ export default function BowlingReservationScreen({ navigation }) {
     setTimeout(() => {
       setLoading(false);
       Vibration.vibrate([0, 80, 60, 120]);
-      const ref = `BOW-${Math.floor(10000 + Math.random() * 90000)}`;
-      addReservation({
+      const ref = isEdit ? editRes.ref : `BOW-${Math.floor(10000 + Math.random() * 90000)}`;
+      const payload = {
         type: 'bowling',
         ref,
         dayLabel: days[selectedDay].label,
@@ -79,9 +89,11 @@ export default function BowlingReservationScreen({ navigation }) {
         players,
         duration,
         total: total.toFixed(0),
-      });
+      };
+      if (isEdit) updateReservation(editRes.id, payload);
+      else addReservation(payload);
       Alert.alert(
-        '🎳 Réservation bowling confirmée !',
+        isEdit ? '🎳 Réservation modifiée !' : '🎳 Réservation bowling confirmée !',
         `Bonjour ${nom} !\n\n📅 ${days[selectedDay].label} à ${selectedTime}\n👥 ${players} joueur(s)\n⏱️ ${duration}\n💶 ~${total.toFixed(0)}€ estimé\n\nRéférence : ${ref}\n\nÀ vos quilles !`,
         [{ text: 'Super !', onPress: () => navigation.goBack() }]
       );
@@ -98,7 +110,7 @@ export default function BowlingReservationScreen({ navigation }) {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={22} color="#fff" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>🎳 Réserver le bowling</Text>
+            <Text style={styles.headerTitle}>{isEdit ? '🎳 Modifier la réservation' : '🎳 Réserver le bowling'}</Text>
             <View style={{ width: 38 }} />
           </View>
         </SafeAreaView>
@@ -228,7 +240,7 @@ export default function BowlingReservationScreen({ navigation }) {
                 size={18}
                 color="#fff"
               />
-              <Text style={styles.summaryBtnText}>{loading ? 'Envoi...' : 'Réserver'}</Text>
+              <Text style={styles.summaryBtnText}>{loading ? 'Envoi...' : isEdit ? 'Enregistrer' : 'Réserver'}</Text>
             </TouchableOpacity>
           </View>
         </View>

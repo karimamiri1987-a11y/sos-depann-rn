@@ -39,6 +39,15 @@ export default function ReservationsScreen({ navigation }) {
     );
   };
 
+  const handleEdit = (r) => {
+    if (r.type === 'bowling') {
+      // L'écran bowling est dans l'onglet « Événements »
+      navigation.navigate('Événements', { screen: 'BowlingReservation', params: { edit: r } });
+    } else {
+      navigation.navigate('TableReservation', { edit: r });
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
       <StatusBar barStyle="light-content" backgroundColor={ODT.primary} />
@@ -76,6 +85,7 @@ export default function ReservationsScreen({ navigation }) {
                     key={r.id}
                     r={r}
                     onCancel={() => handleCancel(r)}
+                    onEdit={() => handleEdit(r)}
                   />
                 ))}
               </>
@@ -102,7 +112,7 @@ export default function ReservationsScreen({ navigation }) {
   );
 }
 
-function ReservationCard({ r, onCancel, onDelete }) {
+function ReservationCard({ r, onCancel, onDelete, onEdit }) {
   const isBowling   = r.type === 'bowling';
   const isCancelled = r.status === 'cancelled';
   const accent      = isBowling ? CYAN : ODT.primary;
@@ -140,18 +150,21 @@ function ReservationCard({ r, onCancel, onDelete }) {
           ) : null}
         </View>
 
-        {/* Table : convives + formules */}
+        {/* Table : mode + convives + formules */}
         {!isBowling && (
           <>
-            {r.guests > 0 && (
-              <View style={styles.infoRow}>
-                <Ionicons name="people-outline" size={14} color={ODT.gray} />
-                <Text style={styles.infoText}>
-                  {r.guests} personne{r.guests > 1 ? 's' : ''}
-                  {r.mode === 'emporter' ? ' · 🥡 à emporter' : ' · 🪑 sur place'}
-                </Text>
-              </View>
-            )}
+            <View style={styles.infoRow}>
+              <Ionicons
+                name={r.mode === 'emporter' ? 'bag-handle-outline' : 'restaurant-outline'}
+                size={14}
+                color={ODT.gray}
+              />
+              <Text style={styles.infoText}>
+                {r.mode === 'emporter'
+                  ? '🥡 À emporter'
+                  : `🪑 Sur place${r.guests > 0 ? ` · ${r.guests} personne${r.guests > 1 ? 's' : ''}` : ''}`}
+              </Text>
+            </View>
             {r.items && r.items.length > 0 && (
               <View style={styles.itemsList}>
                 {r.items.map((it, i) => (
@@ -186,11 +199,21 @@ function ReservationCard({ r, onCancel, onDelete }) {
         ) : null}
 
         {/* Actions */}
-        {!isCancelled && onCancel && (
-          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
-            <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
-            <Text style={styles.cancelBtnText}>Annuler la réservation</Text>
-          </TouchableOpacity>
+        {!isCancelled && (onEdit || onCancel) && (
+          <View style={styles.actionsRow}>
+            {onEdit && (
+              <TouchableOpacity style={styles.editBtn} onPress={onEdit} activeOpacity={0.8}>
+                <Ionicons name="create-outline" size={16} color={accent} />
+                <Text style={[styles.editBtnText, { color: accent }]}>Modifier</Text>
+              </TouchableOpacity>
+            )}
+            {onCancel && (
+              <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
+                <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+                <Text style={styles.cancelBtnText}>Annuler</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
         {isCancelled && onDelete && (
           <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.8}>
@@ -264,11 +287,22 @@ const styles = StyleSheet.create({
   notesRow: { flexDirection: 'row', gap: 6, marginTop: 2, alignItems: 'flex-start' },
   notesText: { fontSize: 12, color: ODT.gray, fontStyle: 'italic', flex: 1 },
 
-  cancelBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+  actionsRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
     marginTop: 6, paddingTop: 10, borderTopWidth: 1, borderTopColor: ODT.border,
   },
-  cancelBtnText: { fontSize: 13, fontWeight: '700', color: '#DC2626' },
+  editBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: ODT.border,
+    backgroundColor: ODT.cream,
+  },
+  editBtnText: { fontSize: 13, fontWeight: '800' },
+  cancelBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+  },
+  cancelBtnText: { fontSize: 13, fontWeight: '800', color: '#DC2626' },
 
   deleteBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
