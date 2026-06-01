@@ -40,21 +40,20 @@ export const NB_COUREURS = NB_EQUIPES * COUREURS_PAR_EQUIPE; // 184
 export const TDF_TEAMS = TEAMS.map((t, i) => ({ id: `t${i + 1}`, ...t }));
 
 // Liste à plat des coureurs avec dossard, équipe et slot (position dans l'équipe)
-export const TDF_RIDERS = [];
-TEAMS.forEach((team, ti) => {
-  team.riders.forEach((name, ri) => {
+export const TDF_RIDERS = TEAMS.flatMap((team, ti) =>
+  team.riders.map((name, ri) => {
     const bib = ti * 10 + (ri + 1);
-    TDF_RIDERS.push({
+    return {
       id: `r${bib}`,
       name,
       team: team.name,
       flag: team.flag,
-      bib,            // dossard
-      slot: ri,       // 0..7 — slot 0 = favori (dossard se terminant par 1)
+      bib,
+      slot: ri,
       isFavorite: ri === 0,
-    });
-  });
-});
+    };
+  })
+);
 
 export const getRiderById = (id) => TDF_RIDERS.find(r => r.id === id);
 
