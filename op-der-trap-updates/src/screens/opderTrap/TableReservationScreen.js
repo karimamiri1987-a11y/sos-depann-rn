@@ -81,6 +81,15 @@ export default function TableReservationScreen({ navigation, route }) {
 
   const isValid = prenom.trim() && nom.trim() && phone.trim() && selectedTime && totalItems > 0;
 
+  // Ce qu'il reste à compléter (affiché dans la barre du bas)
+  const missing = [];
+  if (!prenom.trim() || !nom.trim() || !phone.trim()) missing.push('vos coordonnées');
+  if (!selectedTime) missing.push('une heure');
+  if (totalItems === 0) missing.push('une formule');
+  const missingText = missing.length
+    ? `Il reste à choisir : ${missing.join(', ')}`
+    : '';
+
   const handleSubmit = () => {
     if (!isValid) return;
     setLoading(true);
@@ -89,9 +98,10 @@ export default function TableReservationScreen({ navigation, route }) {
       Vibration.vibrate([0, 80, 60, 120]); // feedback succès
       const ref = `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
+      const notesText = notes.trim() ? `\n📝 ${notes.trim()}` : '';
       const recap = emporter
-        ? `Bonjour ${prenom} !\n\nVotre commande à emporter est enregistrée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
-        : `Bonjour ${prenom} !\n\nVotre table pour ${guests} personne(s) est réservée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €\n\nRéférence : ${ref}\n\nNous vous attendons !`;
+        ? `Bonjour ${prenom} !\n\nVotre commande à emporter est enregistrée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter${notesText}\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
+        : `Bonjour ${prenom} !\n\nVotre table pour ${guests} personne(s) est réservée :\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
       Alert.alert(
         emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
         recap,
@@ -303,26 +313,52 @@ export default function TableReservationScreen({ navigation, route }) {
             />
           </View>
 
-          {/* Submit */}
-          <TouchableOpacity
-            style={[styles.submitBtn, (!isValid || loading) && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={!isValid || loading}
-          >
-            <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.submitText}>
-              {loading
-                ? 'Envoi en cours...'
-                : emporter ? 'Confirmer la commande' : 'Confirmer la réservation'}
-            </Text>
-          </TouchableOpacity>
-
           <Text style={styles.legalNote}>
             Réservation gratuite · Annulation possible jusqu'à 2h avant
           </Text>
 
-          <View style={{ height: 20 }} />
+          <View style={{ height: 16 }} />
         </ScrollView>
+
+        {/* Barre récapitulative collée en bas */}
+        <View style={styles.summaryBar}>
+          {isValid ? (
+            <View style={styles.summaryInfo}>
+              <Text style={styles.summaryLine} numberOfLines={1}>
+                📅 {days[selectedDay].label}  ·  ⏰ {selectedTime}
+                {!emporter ? `  ·  👥 ${guests}` : '  ·  🥡'}
+              </Text>
+              <Text style={styles.summaryItems} numberOfLines={1}>
+                {totalItems} article{totalItems > 1 ? 's' : ''} · {emporter ? 'à emporter' : 'sur place'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.summaryInfo}>
+              <Text style={styles.summaryMissing} numberOfLines={2}>
+                {missingText}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.summaryRight}>
+            {totalItems > 0 && <Text style={styles.summaryTotal}>{totalStr} €</Text>}
+            <TouchableOpacity
+              style={[styles.summaryBtn, (!isValid || loading) && styles.summaryBtnDisabled]}
+              onPress={handleSubmit}
+              disabled={!isValid || loading}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={loading ? 'hourglass-outline' : 'checkmark-circle'}
+                size={18}
+                color="#fff"
+              />
+              <Text style={styles.summaryBtnText}>
+                {loading ? 'Envoi...' : emporter ? 'Commander' : 'Réserver'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -425,24 +461,47 @@ const styles = StyleSheet.create({
   stepCount: { fontSize: 28, fontWeight: '900', color: ODT.primary, minWidth: 36, textAlign: 'center' },
   stepLabel: { fontSize: 15, color: ODT.gray, fontWeight: '600' },
 
-  submitBtn: {
-    backgroundColor: ODT.primary,
-    borderRadius: 14,
-    padding: 16,
+  legalNote: { textAlign: 'center', fontSize: 12, color: ODT.gray, fontStyle: 'italic' },
+
+  // Barre récapitulative collée en bas
+  summaryBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginBottom: 10,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: ODT.white,
+    borderTopWidth: 1,
+    borderTopColor: ODT.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 },
+    elevation: 12,
+  },
+  summaryInfo: { flex: 1 },
+  summaryLine: { fontSize: 13, fontWeight: '800', color: ODT.dark },
+  summaryItems: { fontSize: 12, color: ODT.gray, marginTop: 2 },
+  summaryMissing: { fontSize: 12, color: ODT.gray, fontWeight: '600', lineHeight: 17 },
+  summaryRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  summaryTotal: { fontSize: 18, fontWeight: '900', color: ODT.green },
+  summaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: ODT.primary,
+    borderRadius: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
     shadowColor: ODT.primary,
     shadowOpacity: 0.35,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
   },
-  submitBtnDisabled: { opacity: 0.45, shadowOpacity: 0 },
-  submitText: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  legalNote: { textAlign: 'center', fontSize: 12, color: ODT.gray, fontStyle: 'italic' },
+  summaryBtnDisabled: { backgroundColor: '#B8C4BD', shadowOpacity: 0 },
+  summaryBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 
   formuleRow: {
     flexDirection: 'row',

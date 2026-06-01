@@ -53,6 +53,11 @@ export default function BowlingReservationScreen({ navigation }) {
 
   const days = getNextDays(14);
   const isValid = nom.trim() && phone.trim() && selectedTime;
+
+  const missing = [];
+  if (!nom.trim() || !phone.trim()) missing.push('vos coordonnées');
+  if (!selectedTime) missing.push('une heure');
+  const missingText = missing.length ? `Il reste à choisir : ${missing.join(', ')}` : '';
   const total = players * BOWLING.tarifHeure * (duration === '1h' ? 1 : duration === '1h30' ? 1.5 : duration === '2h' ? 2 : 3);
 
   const handleSubmit = () => {
@@ -175,19 +180,45 @@ export default function BowlingReservationScreen({ navigation }) {
             </Text>
           </View>
 
-          {/* Submit */}
-          <TouchableOpacity
-            style={[styles.submitBtn, (!isValid || loading) && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={!isValid || loading}
-          >
-            <Text style={styles.submitText}>
-              {loading ? 'Réservation en cours...' : '🎳 Confirmer la réservation'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={{ height: 20 }} />
+          <View style={{ height: 16 }} />
         </ScrollView>
+
+        {/* Barre récapitulative collée en bas */}
+        <View style={styles.summaryBar}>
+          {isValid ? (
+            <View style={styles.summaryInfo}>
+              <Text style={styles.summaryLine} numberOfLines={1}>
+                📅 {days[selectedDay].label}  ·  ⏰ {selectedTime}
+              </Text>
+              <Text style={styles.summaryItems} numberOfLines={1}>
+                👥 {players} joueur{players > 1 ? 's' : ''} · ⏱️ {duration}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.summaryInfo}>
+              <Text style={styles.summaryMissing} numberOfLines={2}>
+                {missingText}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.summaryRight}>
+            <Text style={styles.summaryTotal}>~{total.toFixed(0)}€</Text>
+            <TouchableOpacity
+              style={[styles.summaryBtn, (!isValid || loading) && styles.summaryBtnDisabled]}
+              onPress={handleSubmit}
+              disabled={!isValid || loading}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name={loading ? 'hourglass-outline' : 'checkmark-circle'}
+                size={18}
+                color="#fff"
+              />
+              <Text style={styles.summaryBtnText}>{loading ? 'Envoi...' : 'Réserver'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -299,10 +330,25 @@ const styles = StyleSheet.create({
   estimationValue: { fontSize: 36, fontWeight: '900', color: '#fff', marginBottom: 2 },
   estimationSub: { fontSize: 12, color: 'rgba(255,255,255,0.75)' },
 
-  submitBtn: {
-    backgroundColor: CYAN, borderRadius: 14, padding: 16, alignItems: 'center',
-    shadowColor: CYAN, shadowOpacity: 0.35, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 5,
+  // Barre récapitulative collée en bas
+  summaryBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16,
+    backgroundColor: ODT.white, borderTopWidth: 1, borderTopColor: ODT.border,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 }, elevation: 12,
   },
-  submitBtnDisabled: { opacity: 0.4, shadowOpacity: 0 },
-  submitText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  summaryInfo: { flex: 1 },
+  summaryLine: { fontSize: 13, fontWeight: '800', color: ODT.dark },
+  summaryItems: { fontSize: 12, color: ODT.gray, marginTop: 2 },
+  summaryMissing: { fontSize: 12, color: ODT.gray, fontWeight: '600', lineHeight: 17 },
+  summaryRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  summaryTotal: { fontSize: 18, fontWeight: '900', color: CYAN },
+  summaryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: CYAN, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12,
+    shadowColor: CYAN, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
+  summaryBtnDisabled: { backgroundColor: '#A9C7D1', shadowOpacity: 0 },
+  summaryBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 });
