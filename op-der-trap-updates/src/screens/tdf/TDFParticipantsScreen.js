@@ -108,7 +108,7 @@ export default function TDFParticipantsScreen({ navigation }) {
         {isFull ? (
           <View style={styles.completeBox}>
             <Text style={styles.completeText}>
-              ✅ Liste complète ({nbRequis} participants) ! Vous pouvez lancer le tirage au sort.
+              ✅ Liste complète ({nbRequis} participants) ! Le tirage sera effectué par l'administrateur.
             </Text>
           </View>
         ) : (
@@ -158,16 +158,6 @@ export default function TDFParticipantsScreen({ navigation }) {
           )}
         />
 
-        {isComplete && (
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.drawBtn}
-              onPress={() => navigation.navigate('TDFDraw')}
-            >
-              <Text style={styles.drawBtnText}>🎲 Faire le tirage au sort</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </KeyboardAvoidingView>
     </View>
   );

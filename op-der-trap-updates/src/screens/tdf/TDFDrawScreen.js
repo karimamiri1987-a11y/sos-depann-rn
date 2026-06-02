@@ -1,45 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, StatusBar, Alert,
+  StyleSheet, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTDF } from '../../context/TDFContext';
 import { getRiderById } from '../../data/tdfRiders';
 
 export default function TDFDrawScreen({ navigation }) {
-  const {
-    participants, draw, hasDraw, isComplete, performDraw,
-    nbRequis, totalCoureurs,
-  } = useTDF();
-  const [spinning, setSpinning] = useState(false);
-
-  const handleDraw = () => {
-    if (!isComplete) {
-      Alert.alert('Liste incomplète', `Il faut ${nbRequis} participants inscrits avant de lancer le tirage.`);
-      return;
-    }
-    if (hasDraw) {
-      Alert.alert(
-        'Nouveau tirage',
-        'Refaire le tirage effacera les attributions actuelles. Continuer ?',
-        [
-          { text: 'Annuler', style: 'cancel' },
-          { text: 'Refaire', style: 'destructive', onPress: doSpin },
-        ]
-      );
-    } else {
-      doSpin();
-    }
-  };
-
-  const doSpin = () => {
-    setSpinning(true);
-    setTimeout(() => {
-      performDraw();
-      setSpinning(false);
-    }, 900);
-  };
+  const { participants, draw, hasDraw } = useTDF();
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F9F9F9' }}>
@@ -60,51 +29,13 @@ export default function TDFDrawScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Draw button */}
-        <View style={styles.drawSection}>
-          {spinning ? (
-            <View style={styles.spinBox}>
-              <Text style={styles.spinEmoji}>🎰</Text>
-              <Text style={styles.spinText}>Tirage en cours...</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[styles.drawBtn, !isComplete && styles.drawBtnDisabled]}
-              onPress={handleDraw}
-              disabled={!isComplete}
-            >
-              <Text style={styles.drawBtnIcon}>🎲</Text>
-              <Text style={styles.drawBtnText}>
-                {hasDraw ? 'Refaire le tirage' : 'Lancer le tirage'}
-              </Text>
-              <Text style={styles.drawBtnSub}>
-                {participants.length}/{nbRequis} joueurs · {totalCoureurs} coureurs
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {!hasDraw && !spinning && isComplete && (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              🎯 Chaque joueur recevra 8 coureurs : un favori (dossard finissant par 1),
-              puis un coureur pour chaque chiffre jusqu'à 8, répartis aléatoirement entre les {nbRequis} joueurs.
+        {!hasDraw && (
+          <View style={styles.pendingBox}>
+            <Text style={styles.pendingEmoji}>⏳</Text>
+            <Text style={styles.pendingTitle}>Tirage en attente</Text>
+            <Text style={styles.pendingText}>
+              Le tirage au sort sera effectué par l'administrateur une fois la liste des participants complète.
             </Text>
-          </View>
-        )}
-
-        {!isComplete && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              👥 Il faut {nbRequis} participants inscrits ({participants.length} pour l'instant)
-              pour effectuer le tirage.
-            </Text>
-            <TouchableOpacity
-              style={styles.addParticipantsBtn}
-              onPress={() => navigation.navigate('TDFParticipants')}
-            >
-              <Text style={styles.addParticipantsBtnText}>Gérer les participants</Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -165,29 +96,13 @@ const styles = StyleSheet.create({
 
   content: { padding: 16 },
 
-  drawSection: { marginBottom: 16 },
-  drawBtn: {
-    backgroundColor: '#E30613', borderRadius: 16, padding: 24, alignItems: 'center',
-    shadowColor: '#E30613', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  pendingBox: {
+    backgroundColor: '#FFF8E1', borderRadius: 16, padding: 28, marginBottom: 20,
+    alignItems: 'center', borderWidth: 1.5, borderColor: '#FFCC00',
   },
-  drawBtnDisabled: { backgroundColor: '#9CA3AF', shadowOpacity: 0 },
-  drawBtnIcon: { fontSize: 40, marginBottom: 8 },
-  drawBtnText: { fontSize: 20, fontWeight: '800', color: '#fff', marginBottom: 4 },
-  drawBtnSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
-  spinBox: { alignItems: 'center', padding: 32 },
-  spinEmoji: { fontSize: 52, marginBottom: 12 },
-  spinText: { fontSize: 18, fontWeight: '700', color: '#E30613' },
-
-  infoBox: {
-    backgroundColor: '#EFF6FF', borderRadius: 12, padding: 14, marginBottom: 16,
-    borderLeftWidth: 4, borderLeftColor: '#3B82F6',
-  },
-  infoText: { fontSize: 13, color: '#1E40AF', lineHeight: 19 },
-
-  warningBox: { backgroundColor: '#FFF3CD', borderRadius: 12, padding: 16, marginBottom: 16, alignItems: 'center' },
-  warningText: { fontSize: 14, color: '#856404', marginBottom: 12, textAlign: 'center', lineHeight: 20 },
-  addParticipantsBtn: { backgroundColor: '#FFCC00', borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
-  addParticipantsBtnText: { fontWeight: '700', fontSize: 14, color: '#1A1A1A' },
+  pendingEmoji: { fontSize: 40, marginBottom: 12 },
+  pendingTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', marginBottom: 8 },
+  pendingText: { fontSize: 13, color: '#666', textAlign: 'center', lineHeight: 20 },
 
   participantCard: {
     backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 12,

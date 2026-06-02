@@ -143,6 +143,14 @@ export default function ProfileScreen({ navigation }) {
             * Champs obligatoires pour utiliser la pré-saisie automatique.
           </Text>
 
+          <TouchableOpacity
+            style={styles.adminBtn}
+            onPress={() => navigation.navigate('Admin')}
+          >
+            <Ionicons name="settings-outline" size={14} color={ODT.gray} />
+            <Text style={styles.adminBtnText}>Administration</Text>
+          </TouchableOpacity>
+
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -231,4 +239,10 @@ const styles = StyleSheet.create({
   resetBtnText: { fontSize: 14, color: ODT.red, fontWeight: '600' },
 
   hint: { fontSize: 11, color: '#bbb', textAlign: 'center' },
+
+  adminBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, marginTop: 20, paddingVertical: 10, opacity: 0.45,
+  },
+  adminBtnText: { fontSize: 12, color: ODT.gray, fontWeight: '600' },
 });

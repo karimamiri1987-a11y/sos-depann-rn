@@ -28,13 +28,6 @@ export default function TDFHomeScreen({ navigation }) {
       color: ['#1A1A2E', '#16213E'], locked: false,
     },
     {
-      id: 'draw', icon: '🎲', label: 'Tirage au sort',
-      sub: hasDraw ? 'Tirage effectué ✅' : isComplete ? 'Prêt à lancer' : `Complet à ${nbRequis}`,
-      route: 'TDFDraw',
-      color: hasDraw ? ['#16A34A', '#15803D'] : isComplete ? ['#E30613', '#B00010'] : ['#9CA3AF', '#6B7280'],
-      locked: !isComplete && !hasDraw,
-    },
-    {
       id: 'stages', icon: '🏁', label: 'Étapes',
       sub: `${completedStages} / 21 saisies`, route: 'TDFStages',
       color: ['#1A1A2E', '#16213E'], locked: !hasDraw,
@@ -43,6 +36,13 @@ export default function TDFHomeScreen({ navigation }) {
       id: 'leaderboard', icon: '🏆', label: 'Classement',
       sub: leaderName ? `Leader : ${leaderName}` : 'Voir le palmarès', route: 'TDFLeaderboard',
       color: ['#D97706', '#B45309'], locked: !hasDraw,
+    },
+    {
+      id: 'draw', icon: '🎲', label: hasDraw ? 'Mon tirage' : 'Tirage',
+      sub: hasDraw ? 'Voir mes coureurs' : 'En attente du tirage',
+      route: 'TDFDraw',
+      color: hasDraw ? ['#16A34A', '#15803D'] : ['#9CA3AF', '#6B7280'],
+      locked: !hasDraw,
     },
   ];
 
@@ -162,15 +162,15 @@ function RuleRow({ points, label, color, textLight }) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingBottom: 24 },
-  backBtn: { position: 'absolute', top: 8, left: 12, padding: 8, zIndex: 2 },
-  backArrow: { fontSize: 26, color: '#1A1A1A', fontWeight: '800' },
-  headerContent: { alignItems: 'center', paddingTop: 16, paddingBottom: 8 },
-  emoji: { fontSize: 52, marginBottom: 4 },
-  title: { fontSize: 30, fontWeight: '900', color: '#1A1A1A', letterSpacing: 1 },
-  subtitle: { fontSize: 15, fontWeight: '600', color: '#1A1A1A', opacity: 0.7, marginBottom: 12 },
-  cafeBadge: { backgroundColor: 'rgba(0,0,0,0.12)', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
-  cafeText: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
+  header: { paddingBottom: 10 },
+  backBtn: { position: 'absolute', top: 4, left: 12, padding: 8, zIndex: 2 },
+  backArrow: { fontSize: 22, color: '#1A1A1A', fontWeight: '800' },
+  headerContent: { alignItems: 'center', paddingTop: 6, paddingBottom: 4 },
+  emoji: { fontSize: 30, marginBottom: 2 },
+  title: { fontSize: 20, fontWeight: '900', color: '#1A1A1A' },
+  subtitle: { fontSize: 12, fontWeight: '600', color: '#1A1A1A', opacity: 0.7, marginBottom: 6 },
+  cafeBadge: { backgroundColor: 'rgba(0,0,0,0.10)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16 },
+  cafeText: { fontSize: 11, fontWeight: '600', color: '#1A1A1A' },
 
   content: { paddingHorizontal: 16, paddingBottom: 32 },
 

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
 import { useMenu } from '../../context/MenuContext';
+import { useTDF } from '../../context/TDFContext';
 
 const PIN_LENGTH = 4;
 
@@ -15,10 +16,42 @@ export default function AdminScreen({ navigation }) {
           adminUpdate, adminUpdateSetting,
           menu, formules, desserts, plats, events, tarifBowling } = useMenu();
 
+  const {
+    participants: tdfParticipants, hasDraw: tdfHasDraw, isComplete: tdfComplete,
+    performDraw, addParticipant: addTDFParticipant, removeParticipant: removeTDFParticipant,
+    resetAll: resetTDF, nbRequis: tdfNbRequis,
+  } = useTDF();
+
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState('');
-  const [section, setSection] = useState('menu'); // menu | formules | events | tarifs
+  const [section, setSection] = useState('menu'); // menu | formules | events | tarifs | tdf
   const [saving, setSaving] = useState(false);
+
+  const handleTDFDraw = () => {
+    if (tdfHasDraw) {
+      Alert.alert(
+        'Refaire le tirage',
+        'Cela effacera les attributions actuelles. Continuer ?',
+        [
+          { text: 'Annuler', style: 'cancel' },
+          { text: 'Refaire', style: 'destructive', onPress: performDraw },
+        ]
+      );
+    } else {
+      performDraw();
+    }
+  };
+
+  const handleTDFReset = () => {
+    Alert.alert(
+      'Réinitialiser',
+      'Supprimer tous les participants, le tirage et les résultats ? Cette action est irréversible.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Réinitialiser', style: 'destructive', onPress: resetTDF },
+      ]
+    );
+  };
 
   // ── Écran PIN ───────────────────────────────────────────────────────────
   if (!unlocked) {
@@ -100,10 +133,11 @@ export default function AdminScreen({ navigation }) {
       {/* Onglets */}
       <View style={styles.tabs}>
         {[
-          { key: 'menu',     label: 'Menu',      icon: 'calendar' },
-          { key: 'formules', label: 'Formules',  icon: 'restaurant' },
-          { key: 'events',   label: 'Événements',icon: 'star' },
-          { key: 'tarifs',   label: 'Tarifs',    icon: 'cash' },
+          { key: 'menu',     label: 'Menu',     icon: 'calendar' },
+          { key: 'formules', label: 'Formules', icon: 'restaurant' },
+          { key: 'events',   label: 'Events',   icon: 'star' },
+          { key: 'tarifs',   label: 'Tarifs',   icon: 'cash' },
+          { key: 'tdf',      label: 'TDF',      icon: 'bicycle' },
         ].map(t => (
           <TouchableOpacity
             key={t.key}
@@ -234,6 +268,20 @@ export default function AdminScreen({ navigation }) {
           />
         )}
 
+        {/* ── TOUR DE FRANCE ── */}
+        {section === 'tdf' && (
+          <TDFAdminSection
+            participants={tdfParticipants}
+            hasDraw={tdfHasDraw}
+            isComplete={tdfComplete}
+            nbRequis={tdfNbRequis}
+            onAdd={addTDFParticipant}
+            onRemove={removeTDFParticipant}
+            onDraw={handleTDFDraw}
+            onReset={handleTDFReset}
+          />
+        )}
+
         <View style={{ height: 32 }} />
       </ScrollView>
 
@@ -358,6 +406,101 @@ function TarifsSection({ tarifBowling, onSaveTarif }) {
   );
 }
 
+function TDFAdminSection({ participants, hasDraw, isComplete, nbRequis, onAdd, onRemove, onDraw, onReset }) {
+  const [tdfName, setTdfName] = useState('');
+  const isFull = participants.length >= nbRequis;
+  const pct = Math.min(100, Math.round((participants.length / nbRequis) * 100));
+
+  const handleAdd = () => {
+    const trimmed = tdfName.trim();
+    if (!trimmed || isFull) return;
+    onAdd(trimmed);
+    setTdfName('');
+  };
+
+  return (
+    <>
+      <Text style={styles.sectionTitle}>🚴 Tour de France</Text>
+
+      {/* Statut */}
+      <View style={styles.card}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <Text style={styles.fieldLabel}>Participants inscrits</Text>
+          <Text style={{ fontSize: 20, fontWeight: '900', color: isComplete ? '#16A34A' : ODT.primary }}>
+            {participants.length} / {nbRequis}
+          </Text>
+        </View>
+        <View style={styles.tdfBar}>
+          <View style={[styles.tdfBarFill, { width: `${pct}%`, backgroundColor: isComplete ? '#16A34A' : ODT.primary }]} />
+        </View>
+        <Text style={{ fontSize: 11, color: ODT.gray, marginTop: 8, fontWeight: '600' }}>
+          {hasDraw ? '✅ Tirage effectué' : isComplete ? '🎯 Prêt pour le tirage au sort' : `⏳ ${nbRequis - participants.length} participant(s) manquant(s)`}
+        </Text>
+      </View>
+
+      {/* Tirage au sort */}
+      {isComplete && (
+        <TouchableOpacity
+          style={[styles.saveBtn, { backgroundColor: '#E30613', marginBottom: 16 }]}
+          onPress={onDraw}
+        >
+          <Ionicons name="shuffle" size={18} color="#fff" />
+          <Text style={styles.saveBtnText}>
+            {hasDraw ? '🎲 Refaire le tirage au sort' : '🎲 Faire le tirage au sort'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Ajouter un participant */}
+      {!isFull && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Ajouter un participant</Text>
+          <FieldRow label="Nom du participant" value={tdfName} onChange={setTdfName} />
+          <TouchableOpacity
+            style={[styles.saveBtn, !tdfName.trim() && { opacity: 0.4 }]}
+            onPress={handleAdd}
+            disabled={!tdfName.trim()}
+          >
+            <Ionicons name="person-add" size={16} color="#fff" />
+            <Text style={styles.saveBtnText}>Ajouter</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Liste des participants */}
+      {participants.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { marginTop: 12, fontSize: 14 }]}>
+            Liste des participants
+          </Text>
+          {participants.map((p, idx) => (
+            <View key={p.id} style={styles.tdfParticipantRow}>
+              <View style={styles.tdfNumBadge}>
+                <Text style={styles.tdfNumText}>{idx + 1}</Text>
+              </View>
+              <Text style={{ flex: 1, fontSize: 14, fontWeight: '700', color: ODT.dark }}>{p.name}</Text>
+              {hasDraw && (
+                <Text style={{ fontSize: 14, color: '#16A34A', marginRight: 4 }}>✓</Text>
+              )}
+              <TouchableOpacity onPress={() => onRemove(p.id)} style={{ padding: 6 }}>
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      )}
+
+      {/* Réinitialiser */}
+      {(participants.length > 0 || hasDraw) && (
+        <TouchableOpacity style={styles.tdfResetBtn} onPress={onReset}>
+          <Ionicons name="warning-outline" size={16} color="#EF4444" />
+          <Text style={styles.tdfResetBtnText}>Réinitialiser tout (participants + tirage)</Text>
+        </TouchableOpacity>
+      )}
+    </>
+  );
+}
+
 function FieldRow({ label, value, onChange, multiline, keyboardType }) {
   return (
     <View style={styles.fieldRow}>
@@ -436,4 +579,25 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 12,
   },
   savingText: { fontSize: 14, fontWeight: '700', color: ODT.primary },
+
+  // TDF
+  tdfBar: { height: 8, backgroundColor: '#F3F4F6', borderRadius: 4, overflow: 'hidden' },
+  tdfBarFill: { height: 8, borderRadius: 4 },
+  tdfParticipantRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: ODT.white, borderRadius: 12, padding: 12, marginBottom: 8,
+    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 }, elevation: 2,
+  },
+  tdfNumBadge: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: ODT.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  tdfNumText: { fontSize: 11, fontWeight: '800', color: '#fff' },
+  tdfResetBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, marginTop: 8,
+    borderWidth: 1.5, borderColor: '#EF4444', borderRadius: 12,
+  },
+  tdfResetBtnText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
 });

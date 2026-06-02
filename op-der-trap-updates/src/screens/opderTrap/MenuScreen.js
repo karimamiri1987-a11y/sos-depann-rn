@@ -189,15 +189,6 @@ export default function MenuScreen({ navigation }) {
           🌿 Cuisine maison · ☎ {CAFE_INFO.tel}
         </Text>
 
-        {/* Accès admin discret */}
-        <TouchableOpacity
-          style={styles.adminBtn}
-          onPress={() => navigation.navigate('Admin')}
-        >
-          <Ionicons name="settings-outline" size={14} color={ODT.gray} />
-          <Text style={styles.adminBtnText}>Administration</Text>
-        </TouchableOpacity>
-
         <View style={{ height: 16 }} />
       </ScrollView>
     </View>
@@ -403,9 +394,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontStyle: 'italic',
   },
-  adminBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, marginTop: 16, paddingVertical: 8, opacity: 0.45,
-  },
-  adminBtnText: { fontSize: 12, color: ODT.gray, fontWeight: '600' },
 });
