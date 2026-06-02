@@ -6,9 +6,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
-import { FORMULES } from '../../data/opderTrap/menuDuJour';
 import { useProfile } from '../../context/ProfileContext';
 import { useReservations } from '../../context/ReservationsContext';
+import { useMenu } from '../../context/MenuContext';
 
 // Service du midi : un créneau toutes les 15 min entre 12h00 et 13h45
 const TIME_SLOTS = [
@@ -51,6 +51,7 @@ export default function TableReservationScreen({ navigation, route }) {
   const days = getNextDays(14);
   const { profile, hasProfile } = useProfile();
   const { addReservation, updateReservation } = useReservations();
+  const { formules: FORMULES } = useMenu();
 
   // Réservation à modifier (depuis « Mes réservations »)
   const editRes = route?.params?.edit || null;

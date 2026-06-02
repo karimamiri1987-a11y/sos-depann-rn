@@ -9,6 +9,7 @@ import { BOWLING } from '../../data/opderTrap/eventsData';
 import { ODT } from '../../constants/brand';
 import { useProfile } from '../../context/ProfileContext';
 import { useReservations } from '../../context/ReservationsContext';
+import { useMenu } from '../../context/MenuContext';
 
 const CYAN = '#0891B2';
 
@@ -48,6 +49,7 @@ const DURATIONS = ['1h', '1h30', '2h', '3h'];
 export default function BowlingReservationScreen({ navigation, route }) {
   const { profile } = useProfile();
   const { addReservation, updateReservation } = useReservations();
+  const { tarifBowling } = useMenu();
 
   const editRes = route?.params?.edit || null;
   const isEdit = !!editRes;
@@ -80,7 +82,7 @@ export default function BowlingReservationScreen({ navigation, route }) {
   if (!nom.trim() || !phone.trim()) missing.push('vos coordonnées');
   if (!selectedTime) missing.push('une heure');
   const missingText = missing.length ? `Il reste à choisir : ${missing.join(', ')}` : '';
-  const total = players * BOWLING.tarifHeure * (duration === '1h' ? 1 : duration === '1h30' ? 1.5 : duration === '2h' ? 2 : 3);
+  const total = players * tarifBowling * (duration === '1h' ? 1 : duration === '1h30' ? 1.5 : duration === '2h' ? 2 : 3);
 
   const handleSubmit = () => {
     if (!isValid) return;
@@ -133,7 +135,7 @@ export default function BowlingReservationScreen({ navigation, route }) {
           {/* Info banner */}
           <View style={styles.infoBanner}>
             <Text style={styles.infoText}>
-              💡 Tarif : {BOWLING.tarifHeure}€/heure/personne · Ouvert du mardi au dimanche, 8h–21h
+              💡 Tarif : {tarifBowling}€/heure/personne · Ouvert du mardi au dimanche, 8h–21h
             </Text>
           </View>
 
@@ -212,7 +214,7 @@ export default function BowlingReservationScreen({ navigation, route }) {
             <Text style={styles.estimationTitle}>💶 Estimation du coût</Text>
             <Text style={styles.estimationValue}>~{total.toFixed(0)}€</Text>
             <Text style={styles.estimationSub}>
-              {players} pers. × {BOWLING.tarifHeure}€ × {duration}
+              {players} pers. × {tarifBowling}€ × {duration}
             </Text>
           </View>
 

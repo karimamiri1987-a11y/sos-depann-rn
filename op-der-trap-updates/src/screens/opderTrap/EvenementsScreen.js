@@ -6,10 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { EVENTS, BOWLING } from '../../data/opderTrap/eventsData';
+import { BOWLING } from '../../data/opderTrap/eventsData';
 import { ODT } from '../../constants/brand';
+import { useMenu } from '../../context/MenuContext';
 
 export default function EvenementsScreen({ navigation }) {
+  const { events, tarifBowling } = useMenu();
   return (
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
       <StatusBar barStyle="light-content" backgroundColor="#1C3A5E" />
@@ -36,7 +38,7 @@ export default function EvenementsScreen({ navigation }) {
         <View style={styles.bowlingCard}>
           <LinearGradient colors={['#0891B2', '#0E7490']} style={styles.bowlingHeader}>
             <Text style={styles.bowlingTitle}>Notre piste de bowling</Text>
-            <Text style={styles.bowlingPrice}>{BOWLING.tarifHeure}€ / heure / pers.</Text>
+            <Text style={styles.bowlingPrice}>{tarifBowling}€ / heure / pers.</Text>
           </LinearGradient>
           <View style={styles.bowlingBody}>
             <View style={styles.horaireRow}>
@@ -61,11 +63,11 @@ export default function EvenementsScreen({ navigation }) {
 
         {/* Featured event */}
         <Text style={styles.sectionTitle}>⭐ Événement à la une</Text>
-        <EventCard event={EVENTS[0]} featured />
+        {events[0] && <EventCard event={events[0]} featured />}
 
         {/* All events */}
         <Text style={styles.sectionTitle}>📅 Prochains événements</Text>
-        {EVENTS.slice(1).map(event => (
+        {events.slice(1).map(event => (
           <EventCard key={event.id} event={event} />
         ))}
 

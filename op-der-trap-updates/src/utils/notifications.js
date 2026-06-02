@@ -12,6 +12,7 @@
 
 import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
+import Constants from 'expo-constants';
 
 let Notifications = null;
 try {
@@ -139,7 +140,13 @@ export async function registerPushToken(profile) {
   try {
     const granted = await ensurePermissions();
     if (!granted) return;
-    const result = await Notifications.getExpoPushTokenAsync();
+    // Expo SDK 53+ exige le projectId — on le lit depuis la config EAS injectée au build
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+    const result = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : {}
+    );
     const token = result?.data;
     if (!token) return;
     await supabase.from('push_tokens').upsert(

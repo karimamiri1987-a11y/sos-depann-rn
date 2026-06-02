@@ -101,7 +101,12 @@ function AppContent() {
   const { profile } = useProfile();
 
   // Initialise les notifications et enregistre le token push au démarrage.
-  useEffect(() => { initNotifications(); }, []);
+  useEffect(() => {
+    initNotifications();
+    registerPushToken(profile); // premier enregistrement (profil peut être vide)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Re-enregistre quand le profil est rempli pour associer le nom au token
   useEffect(() => {
     if (profile.prenom || profile.nom || profile.phone) {
       registerPushToken(profile);

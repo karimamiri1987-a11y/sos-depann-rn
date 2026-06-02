@@ -7,17 +7,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  CAFE_INFO, HORAIRES, MENU_SEMAINE, PLATS_PERMANENTS, DESSERTS,
+  CAFE_INFO, HORAIRES,
 } from '../../data/opderTrap/menuDuJour';
 import { ODT } from '../../constants/brand';
 import { getOpenStatus } from '../../utils/openStatus';
 import { useProfile } from '../../context/ProfileContext';
 import { useReservations } from '../../context/ReservationsContext';
+import { useMenu } from '../../context/MenuContext';
 
 export default function MenuScreen({ navigation }) {
   const status = getOpenStatus();
   const { profile, hasProfile } = useProfile();
   const { reservations } = useReservations();
+  const { menu, plats, desserts } = useMenu();
   const activeCount = reservations.filter(r => r.status !== 'cancelled').length;
 
   return (
@@ -94,7 +96,7 @@ export default function MenuScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Menu de la semaine</Text>
         </View>
 
-        {MENU_SEMAINE.map(day => (
+        {menu.map(day => (
           <TouchableOpacity
             key={day.id}
             style={styles.dayCard}
@@ -131,10 +133,10 @@ export default function MenuScreen({ navigation }) {
           <Text style={styles.sectionTitle}>Toujours disponible</Text>
         </View>
         <View style={styles.permCard}>
-          {PLATS_PERMANENTS.map((p, i) => (
+          {plats.map((p, i) => (
             <View
               key={p.id}
-              style={[styles.permRow, i < PLATS_PERMANENTS.length - 1 && styles.permRowBorder]}
+              style={[styles.permRow, i < plats.length - 1 && styles.permRowBorder]}
             >
               <Text style={styles.permIcon}>{p.icon}</Text>
               <View style={{ flex: 1 }}>
@@ -154,12 +156,12 @@ export default function MenuScreen({ navigation }) {
 
         <View style={styles.dessertCard}>
           <Text style={styles.dessertGroupTitle}>⭐ Les suggestions du moment</Text>
-          {DESSERTS.suggestions.map(d => (
+          {desserts.suggestions.map(d => (
             <DessertRow key={d.id} item={d} />
           ))}
           <View style={styles.dessertDivider} />
           <Text style={styles.dessertGroupTitle}>🍦 Les grands classiques</Text>
-          {DESSERTS.classiques.map(d => (
+          {desserts.classiques.map(d => (
             <DessertRow key={d.id} item={d} />
           ))}
         </View>
