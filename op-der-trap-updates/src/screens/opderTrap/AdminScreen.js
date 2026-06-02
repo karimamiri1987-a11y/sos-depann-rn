@@ -525,7 +525,7 @@ function NotificationsSection() {
   const [title, setTitle]       = useState('');
   const [body, setBody]         = useState('');
   const [mode, setMode]         = useState('all'); // 'all' | 'select'
-  const [selected, setSelected] = useState(new Set());
+  const [selected, setSelected] = useState({});    // { [id]: true }
 
   useEffect(() => {
     setLoadingTokens(true);
@@ -536,19 +536,20 @@ function NotificationsSection() {
   }, []);
 
   const toggleSelect = (id) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setSelected(prev =>
+      prev[id] ? { ...prev, [id]: undefined } : { ...prev, [id]: true }
+    );
   };
+
+  const isSelected = (id) => !!selected[id];
+  const selectedCount = Object.values(selected).filter(Boolean).length;
 
   const sendNotifs = async () => {
     if (!title.trim() || !body.trim()) {
       Alert.alert('Champs manquants', 'Remplissez le titre et le message.');
       return;
     }
-    const targets = mode === 'all' ? tokens : tokens.filter(t => selected.has(t.id));
+    const targets = mode === 'all' ? tokens : tokens.filter(t => isSelected(t.id));
     if (targets.length === 0) {
       Alert.alert('Aucun destinataire', 'Sélectionnez au moins un appareil.');
       return;
@@ -579,7 +580,7 @@ function NotificationsSection() {
         Alert.alert('✅ Envoyé', `${targets.length} notification(s) envoyée(s).`);
         setTitle('');
         setBody('');
-        setSelected(new Set());
+        setSelected({});
       }
     } catch {
       Alert.alert('Erreur', "L'envoi a échoué. Vérifiez votre connexion.");
@@ -632,8 +633,8 @@ function NotificationsSection() {
                 onPress={() => toggleSelect(t.id)}
                 activeOpacity={0.75}
               >
-                <View style={[styles.checkbox, selected.has(t.id) && styles.checkboxChecked]}>
-                  {selected.has(t.id) && <Text style={styles.checkmark}>✓</Text>}
+                <View style={[styles.checkbox, isSelected(t.id) && styles.checkboxChecked]}>
+                  {isSelected(t.id) && <Text style={styles.checkmark}>✓</Text>}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tokenName}>
@@ -654,7 +655,7 @@ function NotificationsSection() {
       >
         <Ionicons name="send" size={16} color="#fff" />
         <Text style={styles.saveBtnText}>
-          {sending ? 'Envoi…' : `Envoyer${mode === 'select' && selected.size > 0 ? ` (${selected.size})` : ''}`}
+          {sending ? 'Envoi…' : `Envoyer${mode === 'select' && selectedCount > 0 ? ` (${selectedCount})` : ''}`}
         </Text>
       </TouchableOpacity>
     </>
