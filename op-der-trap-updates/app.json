@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1B3A2D"
+      "backgroundColor": "#23262B"
     },
     "ios": {
       "supportsTablet": true,
@@ -18,7 +18,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1B3A2D"
+        "backgroundColor": "#23262B"
       },
       "package": "be.opdertrap.app",
       "versionCode": 1,
