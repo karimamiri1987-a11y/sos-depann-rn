@@ -199,6 +199,7 @@ export default function AdminScreen({ navigation }) {
                     await adminUpdate('formules', {
                       id: updated.id, name: updated.name,
                       desc_fr: updated.desc, price: updated.price, icon: updated.icon,
+                      max_par_jour: updated.maxParJour ?? 0,
                     });
                     Alert.alert('✅ Enregistré', `${updated.name} mis à jour.`);
                   } catch { Alert.alert('Erreur', 'La sauvegarde a échoué.'); }
@@ -328,15 +329,18 @@ function FormuleCard({ item, onSave }) {
   const [name, setName] = useState(item.name);
   const [desc, setDesc] = useState(item.desc);
   const [price, setPrice] = useState(item.price);
-  const dirty = name !== item.name || desc !== item.desc || price !== item.price;
+  const [maxParJour, setMaxParJour] = useState(String(item.maxParJour ?? 0));
+  const dirty = name !== item.name || desc !== item.desc || price !== item.price
+    || maxParJour !== String(item.maxParJour ?? 0);
   return (
     <View style={styles.card}>
       <Text style={styles.cardIcon}>{item.icon}</Text>
       <FieldRow label="Nom" value={name} onChange={setName} />
       <FieldRow label="Description" value={desc} onChange={setDesc} multiline />
       <FieldRow label="Prix (ex: 15,50 €)" value={price} onChange={setPrice} />
+      <FieldRow label="Max / jour (0 = illimité)" value={maxParJour} onChange={setMaxParJour} keyboardType="numeric" />
       {dirty && (
-        <TouchableOpacity style={styles.saveBtn} onPress={() => onSave({ ...item, name, desc, price })}>
+        <TouchableOpacity style={styles.saveBtn} onPress={() => onSave({ ...item, name, desc, price, maxParJour: parseInt(maxParJour, 10) || 0 })}>
           <Ionicons name="checkmark-circle" size={16} color="#fff" />
           <Text style={styles.saveBtnText}>Enregistrer</Text>
         </TouchableOpacity>

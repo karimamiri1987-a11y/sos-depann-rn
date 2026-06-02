@@ -9,6 +9,7 @@ import { ODT } from '../../constants/brand';
 import { useProfile } from '../../context/ProfileContext';
 import { useReservations } from '../../context/ReservationsContext';
 import { useMenu } from '../../context/MenuContext';
+import { supabase } from '../../lib/supabase';
 
 // Service du midi : un créneau toutes les 15 min entre 12h00 et 13h45
 const TIME_SLOTS = [
@@ -96,6 +97,40 @@ export default function TableReservationScreen({ navigation, route }) {
   const [selectedTime, setSelectedTime] = useState(editRes ? editRes.time : null);
   const [quantities, setQuantities] = useState(editRes && editRes.quantities ? editRes.quantities : {}); // { [formuleId]: nombre }
   const [mode, setMode] = useState(editRes ? (editRes.mode || 'place') : 'place'); // 'place' | 'emporter'
+  const [stockCounts, setStockCounts] = useState({}); // { 'YYYY-MM-DD': { formuleId: count } }
+
+  // Charge le stock Supabase pour les 14 prochains jours
+  useEffect(() => {
+    const dateISOs = days.map(d => d.dateISO);
+    supabase
+      .from('reservation_stock')
+      .select('formule_id, date_iso, count')
+      .in('date_iso', dateISOs)
+      .then(({ data }) => {
+        if (!data) return;
+        const counts = {};
+        data.forEach(r => {
+          if (!counts[r.date_iso]) counts[r.date_iso] = {};
+          counts[r.date_iso][r.formule_id] = r.count;
+        });
+        setStockCounts(counts);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Retourne les infos de stock d'une formule pour le jour sélectionné
+  const getStock = (formuleId) => {
+    const f = FORMULES.find(f2 => f2.id === formuleId);
+    const max = f?.maxParJour || 0;
+    if (!max) return { soldOut: false, remaining: null, max: 0 };
+    const dateISO = days[selectedDay]?.dateISO;
+    // En édition : la ré déjà prise ne compte pas pour la limite affichée
+    const ownQty = isEdit ? (editRes.quantities?.[formuleId] || 0) : 0;
+    const used = Math.max(0, (stockCounts[dateISO]?.[formuleId] || 0) - ownQty);
+    const remaining = Math.max(0, max - used);
+    return { soldOut: remaining === 0, remaining, max };
+  };
 
   const isWeekend = days[selectedDay]?.day === 'Sam' || days[selectedDay]?.day === 'Dim';
 
@@ -154,12 +189,14 @@ export default function TableReservationScreen({ navigation, route }) {
       const recap = emporter
         ? `${intro}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter${notesText}\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
         : `${intro}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
+      const newDateISO = days[selectedDay].dateISO;
       const payload = {
         type: 'table',
         ref,
         dayLabel: days[selectedDay].label,
+        dateISO: newDateISO,
         time: selectedTime,
-        whenISO: computeWhenISO(days[selectedDay].dateISO, selectedTime),
+        whenISO: computeWhenISO(newDateISO, selectedTime),
         name: `${prenom} ${nom}`.trim(),
         prenom,
         nom,
@@ -171,8 +208,22 @@ export default function TableReservationScreen({ navigation, route }) {
         totalStr,
         notes: notes.trim(),
       };
-      if (isEdit) updateReservation(editRes.id, payload);
-      else addReservation(payload);
+      if (isEdit) {
+        // Annuler l'ancien stock, puis appliquer le nouveau
+        const oldDateISO = editRes.dateISO || editRes.whenISO?.slice(0, 10);
+        if (oldDateISO) {
+          Object.entries(editRes.quantities || {}).forEach(([fid, qty]) => {
+            if (qty > 0) supabase.rpc('adjust_stock', { p_formule_id: fid, p_date_iso: oldDateISO, p_delta: -qty }).catch(() => {});
+          });
+        }
+        updateReservation(editRes.id, payload);
+      } else {
+        addReservation(payload);
+      }
+      // Incrémenter le stock pour la nouvelle réservation
+      selectedItems.forEach(item => {
+        supabase.rpc('adjust_stock', { p_formule_id: item.id, p_date_iso: newDateISO, p_delta: item.qty }).catch(() => {});
+      });
       Alert.alert(
         isEdit ? '✅ Réservation modifiée !' : emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
         recap,
@@ -308,17 +359,24 @@ export default function TableReservationScreen({ navigation, route }) {
             {(isWeekend ? FORMULES.filter(f => f.id === 'f_croque') : FORMULES).map(f => {
               const qty = quantities[f.id] || 0;
               const active = qty > 0;
+              const stock = getStock(f.id);
+              const soldOut = stock.soldOut;
               return (
                 <View
                   key={f.id}
-                  style={[styles.formuleRow, active && styles.formuleRowActive]}
+                  style={[styles.formuleRow, active && styles.formuleRowActive, soldOut && styles.formuleRowSoldOut]}
                 >
                   <Text style={styles.formuleIcon}>{f.icon}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.formuleName, active && { color: ODT.primary }]}>{f.name}</Text>
                     <Text style={styles.formuleDesc}>{f.desc}</Text>
                     {f.price && (
-                      <Text style={[styles.formulePrice, active && { color: ODT.primary }]}>{f.price}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                        <Text style={[styles.formulePrice, active && { color: ODT.primary }]}>{f.price}</Text>
+                        {stock.max > 0 && !soldOut && (
+                          <Text style={styles.stockRemaining}>{stock.remaining}/{stock.max} restants</Text>
+                        )}
+                      </View>
                     )}
                   </View>
                   <View style={styles.qtyRow}>
@@ -330,10 +388,21 @@ export default function TableReservationScreen({ navigation, route }) {
                       <Ionicons name="remove" size={18} color={qty === 0 ? '#ccc' : ODT.primary} />
                     </TouchableOpacity>
                     <Text style={styles.qtyCount}>{qty}</Text>
-                    <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty(f.id, 1)}>
-                      <Ionicons name="add" size={18} color={ODT.primary} />
+                    <TouchableOpacity
+                      style={[styles.qtyBtn, soldOut && styles.qtyBtnDisabled]}
+                      onPress={() => setQty(f.id, 1)}
+                      disabled={soldOut}
+                    >
+                      <Ionicons name="add" size={18} color={soldOut ? '#ccc' : ODT.primary} />
                     </TouchableOpacity>
                   </View>
+
+                  {/* Overlay COMPLET */}
+                  {soldOut && (
+                    <View style={styles.soldOutOverlay} pointerEvents="none">
+                      <Text style={styles.soldOutText}>COMPLET</Text>
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -610,4 +679,29 @@ const styles = StyleSheet.create({
   modeBtnActive: { backgroundColor: ODT.primary, borderColor: ODT.primary },
   modeText: { fontSize: 14, fontWeight: '800', color: ODT.primary },
   modeTextActive: { color: '#fff' },
+
+  formuleRowSoldOut: { opacity: 0.55, borderColor: '#EF4444' },
+  soldOutOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  soldOutText: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#EF4444',
+    letterSpacing: 4,
+    transform: [{ rotate: '-18deg' }],
+    borderWidth: 3,
+    borderColor: '#EF4444',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  stockRemaining: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#D97706',
+  },
 });

@@ -17,7 +17,7 @@ const CACHE_URI = FileSystem.documentDirectory + 'menu_cache.json';
 function buildFallback() {
   return {
     menu: STATIC_MENU,
-    formules: STATIC_FORMULES,
+    formules: STATIC_FORMULES.map(f => ({ ...f, maxParJour: 0 })),
     desserts: STATIC_DESSERTS,
     plats: STATIC_PLATS,
     events: STATIC_EVENTS,
@@ -68,6 +68,7 @@ async function fetchFromSupabase() {
     })),
     formules: (formules.data || []).map(r => ({
       id: r.id, name: r.name, desc: r.desc_fr, price: r.price, icon: r.icon,
+      maxParJour: r.max_par_jour || 0,
     })),
     desserts: {
       suggestions: dessertsData.filter(d => d.groupe === 'suggestion').map(r => ({

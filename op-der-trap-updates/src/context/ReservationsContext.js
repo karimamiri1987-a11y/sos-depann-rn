@@ -1,6 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import { scheduleReservationReminders, cancelReminders } from '../utils/notifications';
+import { supabase } from '../lib/supabase';
+
+// Décrémente le stock Supabase quand une réservation table est annulée.
+function releaseStock(res) {
+  if (res.type !== 'table' || !res.quantities) return;
+  const dateISO = res.dateISO || res.whenISO?.slice(0, 10);
+  if (!dateISO) return;
+  Object.entries(res.quantities).forEach(([formuleId, qty]) => {
+    if (qty > 0) {
+      supabase.rpc('adjust_stock', {
+        p_formule_id: formuleId,
+        p_date_iso: dateISO,
+        p_delta: -qty,
+      }).catch(() => {});
+    }
+  });
+}
 
 const ReservationsContext = createContext(null);
 const FILE_URI = FileSystem.documentDirectory + 'reservations.json';
@@ -82,6 +99,7 @@ export function ReservationsProvider({ children }) {
   const cancelReservation = useCallback((id) => {
     const existing = resRef.current.find(r => r.id === id);
     if (existing?.notifIds) cancelReminders(existing.notifIds);
+    releaseStock(existing); // libère le stock dans Supabase
     setReservations(prev => {
       const updated = prev.map(r => r.id === id ? { ...r, status: 'cancelled', notifIds: [] } : r);
       persist(updated);
