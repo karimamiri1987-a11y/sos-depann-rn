@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TDFProvider } from './src/context/TDFContext';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { ReservationsProvider } from './src/context/ReservationsContext';
+import { MenuProvider }         from './src/context/MenuContext';
 import { initNotifications } from './src/utils/notifications';
 
 // Op der Trap screens
@@ -22,6 +23,7 @@ import CarteScreen              from './src/screens/opderTrap/CarteScreen';
 import InfosScreen             from './src/screens/opderTrap/InfosScreen';
 import ProfileScreen           from './src/screens/opderTrap/ProfileScreen';
 import ReservationsScreen      from './src/screens/opderTrap/ReservationsScreen';
+import AdminScreen             from './src/screens/opderTrap/AdminScreen';
 
 // TDF screens (intégrés dans l'onglet Pronostics)
 import TDFHomeScreen         from './src/screens/tdf/TDFHomeScreen';
@@ -54,6 +56,7 @@ function MenuStack() {
       <SMenu.Screen name="TableReservation" component={TableReservationScreen} />
       <SMenu.Screen name="Profile"          component={ProfileScreen} />
       <SMenu.Screen name="Reservations"     component={ReservationsScreen} />
+      <SMenu.Screen name="Admin"            component={AdminScreen} />
     </SMenu.Navigator>
   );
 }
@@ -165,11 +168,13 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ProfileProvider>
-        <ReservationsProvider>
-          <TDFProvider>
-            <AppContent />
-          </TDFProvider>
-        </ReservationsProvider>
+        <MenuProvider>
+          <ReservationsProvider>
+            <TDFProvider>
+              <AppContent />
+            </TDFProvider>
+          </ReservationsProvider>
+        </MenuProvider>
       </ProfileProvider>
     </SafeAreaProvider>
   );
