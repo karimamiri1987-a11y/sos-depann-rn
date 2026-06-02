@@ -17,7 +17,7 @@ const CACHE_URI = FileSystem.documentDirectory + 'menu_cache.json';
 function buildFallback() {
   return {
     menu: STATIC_MENU,
-    formules: STATIC_FORMULES.map(f => ({ ...f, maxParJour: 0 })),
+    formules: STATIC_FORMULES.map(f => ({ ...f })),
     desserts: STATIC_DESSERTS,
     plats: STATIC_PLATS,
     events: STATIC_EVENTS,
@@ -26,6 +26,7 @@ function buildFallback() {
     cafeFacebook: '',
     cafeInstagram: '',
     adminPin: '1234',
+    stockLimits: {}, // { [formule_id]: { [day_of_week]: max_count } }
   };
 }
 
@@ -47,19 +48,27 @@ async function saveCache(data) {
 }
 
 async function fetchFromSupabase() {
-  const [menu, formules, desserts, plats, events, settings] = await Promise.all([
+  const [menu, formules, desserts, plats, events, settings, stockLimitsRes] = await Promise.all([
     supabase.from('menu_semaine').select('*').order('ordre'),
     supabase.from('formules').select('*').eq('actif', true).order('ordre'),
     supabase.from('desserts').select('*').eq('actif', true).order('ordre'),
     supabase.from('plats_permanents').select('*').eq('actif', true).order('ordre'),
     supabase.from('events').select('*').eq('actif', true).order('ordre'),
     supabase.from('settings').select('*'),
+    supabase.from('stock_limits').select('*'),
   ]);
 
   if (menu.error || formules.error) throw new Error('Supabase fetch failed');
 
   const settingsMap = {};
   (settings.data || []).forEach(r => { settingsMap[r.key] = r.value; });
+
+  // { [formule_id]: { [day_of_week]: max_count } }
+  const stockLimits = {};
+  (stockLimitsRes.data || []).forEach(r => {
+    if (!stockLimits[r.formule_id]) stockLimits[r.formule_id] = {};
+    stockLimits[r.formule_id][r.day_of_week] = r.max_count;
+  });
 
   const dessertsData = desserts.data || [];
   return {
@@ -68,7 +77,6 @@ async function fetchFromSupabase() {
     })),
     formules: (formules.data || []).map(r => ({
       id: r.id, name: r.name, desc: r.desc_fr, price: r.price, icon: r.icon,
-      maxParJour: r.max_par_jour || 0,
     })),
     desserts: {
       suggestions: dessertsData.filter(d => d.groupe === 'suggestion').map(r => ({
@@ -90,6 +98,7 @@ async function fetchFromSupabase() {
     cafeFacebook: settingsMap['cafe_facebook'] || '',
     cafeInstagram:settingsMap['cafe_instagram']|| '',
     adminPin:     settingsMap['admin_pin']     || '1234',
+    stockLimits,
   };
 }
 

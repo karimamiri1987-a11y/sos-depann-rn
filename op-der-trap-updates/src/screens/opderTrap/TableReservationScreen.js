@@ -52,7 +52,7 @@ export default function TableReservationScreen({ navigation, route }) {
   const days = getNextDays(14);
   const { profile, hasProfile } = useProfile();
   const { addReservation, updateReservation } = useReservations();
-  const { formules: FORMULES } = useMenu();
+  const { formules: FORMULES, stockLimits } = useMenu();
 
   // Réservation à modifier (depuis « Mes réservations »)
   const editRes = route?.params?.edit || null;
@@ -121,11 +121,13 @@ export default function TableReservationScreen({ navigation, route }) {
 
   // Retourne les infos de stock d'une formule pour le jour sélectionné
   const getStock = (formuleId) => {
-    const f = FORMULES.find(f2 => f2.id === formuleId);
-    const max = f?.maxParJour || 0;
-    if (!max) return { soldOut: false, remaining: null, max: 0 };
     const dateISO = days[selectedDay]?.dateISO;
-    // En édition : la ré déjà prise ne compte pas pour la limite affichée
+    if (!dateISO) return { soldOut: false, remaining: null, max: 0 };
+    // Utilise midi pour éviter les décalages de fuseau horaire
+    const dow = new Date(dateISO + 'T12:00:00').getDay(); // 0=Dim, 1=Lun, ..., 6=Sam
+    const max = stockLimits?.[formuleId]?.[dow] || 0;
+    if (!max) return { soldOut: false, remaining: null, max: 0 };
+    // En édition : la quantité déjà réservée ne compte pas pour la limite affichée
     const ownQty = isEdit ? (editRes.quantities?.[formuleId] || 0) : 0;
     const used = Math.max(0, (stockCounts[dateISO]?.[formuleId] || 0) - ownQty);
     const remaining = Math.max(0, max - used);
@@ -400,7 +402,9 @@ export default function TableReservationScreen({ navigation, route }) {
                   {/* Overlay COMPLET */}
                   {soldOut && (
                     <View style={styles.soldOutOverlay} pointerEvents="none">
-                      <Text style={styles.soldOutText}>COMPLET</Text>
+                      <View style={styles.soldOutBadge}>
+                        <Text style={styles.soldOutText}>COMPLET</Text>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -680,24 +684,30 @@ const styles = StyleSheet.create({
   modeText: { fontSize: 14, fontWeight: '800', color: ODT.primary },
   modeTextActive: { color: '#fff' },
 
-  formuleRowSoldOut: { opacity: 0.55, borderColor: '#EF4444' },
+  formuleRowSoldOut: { opacity: 0.6, borderColor: '#EF4444' },
   soldOutOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
   },
-  soldOutText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#EF4444',
-    letterSpacing: 4,
-    transform: [{ rotate: '-18deg' }],
+  soldOutBadge: {
     borderWidth: 3,
     borderColor: '#EF4444',
     paddingHorizontal: 10,
     paddingVertical: 2,
     borderRadius: 4,
+    transform: [{ rotate: '-18deg' }],
+  },
+  soldOutText: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#EF4444',
+    letterSpacing: 4,
   },
   stockRemaining: {
     fontSize: 11,

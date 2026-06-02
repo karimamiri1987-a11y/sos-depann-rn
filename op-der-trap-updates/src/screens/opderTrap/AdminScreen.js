@@ -15,7 +15,7 @@ const PIN_LENGTH = 4;
 export default function AdminScreen({ navigation }) {
   const { adminPin, loading, lastSync, refresh,
           adminUpdate, adminUpdateSetting,
-          menu, formules, desserts, plats, events, tarifBowling } = useMenu();
+          menu, formules, desserts, plats, events, tarifBowling, stockLimits } = useMenu();
 
   const {
     participants: tdfParticipants, hasDraw: tdfHasDraw, isComplete: tdfComplete,
@@ -193,14 +193,21 @@ export default function AdminScreen({ navigation }) {
               <FormuleCard
                 key={f.id}
                 item={f}
+                stockLimits={stockLimits}
                 onSave={async (updated) => {
                   setSaving(true);
                   try {
                     await adminUpdate('formules', {
                       id: updated.id, name: updated.name,
                       desc_fr: updated.desc, price: updated.price, icon: updated.icon,
-                      max_par_jour: updated.maxParJour ?? 0,
                     });
+                    // Stock par jour de la semaine
+                    const limitsRows = Object.entries(updated.dayLimits).map(([dow, max_count]) => ({
+                      formule_id: updated.id,
+                      day_of_week: parseInt(dow, 10),
+                      max_count,
+                    }));
+                    await adminUpdate('stock_limits', limitsRows);
                     Alert.alert('✅ Enregistré', `${updated.name} mis à jour.`);
                   } catch { Alert.alert('Erreur', 'La sauvegarde a échoué.'); }
                   finally { setSaving(false); }
@@ -325,22 +332,61 @@ function MenuDayCard({ day, onSave }) {
   );
 }
 
-function FormuleCard({ item, onSave }) {
+const OPEN_DAYS = [
+  { dow: 2, label: 'Mar' },
+  { dow: 3, label: 'Mer' },
+  { dow: 4, label: 'Jeu' },
+  { dow: 5, label: 'Ven' },
+  { dow: 6, label: 'Sam' },
+  { dow: 0, label: 'Dim' },
+];
+
+function FormuleCard({ item, stockLimits, onSave }) {
   const [name, setName] = useState(item.name);
   const [desc, setDesc] = useState(item.desc);
   const [price, setPrice] = useState(item.price);
-  const [maxParJour, setMaxParJour] = useState(String(item.maxParJour ?? 0));
-  const dirty = name !== item.name || desc !== item.desc || price !== item.price
-    || maxParJour !== String(item.maxParJour ?? 0);
+  const [dayLimits, setDayLimits] = useState(() =>
+    OPEN_DAYS.reduce((acc, { dow }) => ({ ...acc, [dow]: String(stockLimits?.[item.id]?.[dow] || 0) }), {})
+  );
+
+  const origLimits = OPEN_DAYS.reduce((acc, { dow }) => ({ ...acc, [dow]: String(stockLimits?.[item.id]?.[dow] || 0) }), {});
+  const limsDirty = OPEN_DAYS.some(({ dow }) => dayLimits[dow] !== origLimits[dow]);
+  const dirty = name !== item.name || desc !== item.desc || price !== item.price || limsDirty;
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardIcon}>{item.icon}</Text>
       <FieldRow label="Nom" value={name} onChange={setName} />
       <FieldRow label="Description" value={desc} onChange={setDesc} multiline />
       <FieldRow label="Prix (ex: 15,50 €)" value={price} onChange={setPrice} />
-      <FieldRow label="Max / jour (0 = illimité)" value={maxParJour} onChange={setMaxParJour} keyboardType="numeric" />
+
+      <Text style={[styles.fieldLabel, { marginBottom: 8, marginTop: 4 }]}>
+        Stock max par jour de semaine (0 = illimité)
+      </Text>
+      <View style={styles.dayLimitsRow}>
+        {OPEN_DAYS.map(({ dow, label }) => (
+          <View key={dow} style={styles.dayLimitCell}>
+            <Text style={styles.dayLimitLabel}>{label}</Text>
+            <TextInput
+              style={styles.dayLimitInput}
+              value={dayLimits[dow]}
+              onChangeText={val => setDayLimits(prev => ({ ...prev, [dow]: val.replace(/[^0-9]/g, '') }))}
+              keyboardType="numeric"
+              maxLength={3}
+              textAlign="center"
+            />
+          </View>
+        ))}
+      </View>
+
       {dirty && (
-        <TouchableOpacity style={styles.saveBtn} onPress={() => onSave({ ...item, name, desc, price, maxParJour: parseInt(maxParJour, 10) || 0 })}>
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={() => onSave({
+            ...item, name, desc, price,
+            dayLimits: OPEN_DAYS.reduce((acc, { dow }) => ({ ...acc, [dow]: parseInt(dayLimits[dow], 10) || 0 }), {}),
+          })}
+        >
           <Ionicons name="checkmark-circle" size={16} color="#fff" />
           <Text style={styles.saveBtnText}>Enregistrer</Text>
         </TouchableOpacity>
@@ -765,6 +811,15 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#EF4444', borderRadius: 12,
   },
   tdfResetBtnText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
+
+  // Limites de stock par jour
+  dayLimitsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  dayLimitCell: { alignItems: 'center' },
+  dayLimitLabel: { fontSize: 10, fontWeight: '700', color: ODT.gray, marginBottom: 4 },
+  dayLimitInput: {
+    width: 48, backgroundColor: ODT.cream, borderRadius: 8, paddingVertical: 8,
+    fontSize: 14, color: ODT.dark, borderWidth: 1.5, borderColor: ODT.border,
+  },
 
   // Notifications
   notifModeRow: { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 },
