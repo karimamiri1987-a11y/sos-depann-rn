@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, FlatList,
-  StyleSheet, StatusBar, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, StatusBar, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTDF } from '../../context/TDFContext';
 import { useProfile } from '../../context/ProfileContext';
 
 export default function TDFParticipantsScreen({ navigation }) {
-  const { participants, draw, isComplete, nbRequis, addParticipant, removeParticipant } = useTDF();
+  const { participants, draw, isComplete, nbRequis, addParticipant } = useTDF();
   const { profile, hasProfile } = useProfile();
   const [name, setName] = useState('');
 
@@ -29,21 +29,6 @@ export default function TDFParticipantsScreen({ navigation }) {
     if (!trimmed || isFull) return;
     addParticipant(trimmed);
     setName('');
-  };
-
-  const handleRemove = (participant) => {
-    Alert.alert(
-      'Supprimer',
-      `Retirer ${participant.name} de la liste ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () => removeParticipant(participant.id),
-        },
-      ]
-    );
   };
 
   const hasDraw = Object.keys(draw).length > 0;
@@ -138,22 +123,17 @@ export default function TDFParticipantsScreen({ navigation }) {
               <Text style={styles.emptySub}>Ajoutez des joueurs pour commencer</Text>
             </View>
           }
-          renderItem={({ item, index }) => (
+          renderItem={({ item }) => (
             <View style={styles.item}>
-              <View style={styles.itemLeft}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{item.name[0].toUpperCase()}</Text>
-                </View>
-                <View>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  {draw[item.id] && (
-                    <Text style={styles.itemSub}>{draw[item.id].length} coureur(s) attribué(s)</Text>
-                  )}
-                </View>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{item.name[0].toUpperCase()}</Text>
               </View>
-              <TouchableOpacity onPress={() => handleRemove(item)} style={styles.deleteBtn}>
-                <Text style={styles.deleteIcon}>🗑️</Text>
-              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemName}>{item.name}</Text>
+                {draw[item.id] && (
+                  <Text style={styles.itemSub}>{draw[item.id].length} coureur(s) attribué(s)</Text>
+                )}
+              </View>
             </View>
           )}
         />

@@ -11,6 +11,7 @@
 // en plus un serveur + un build de développement — voir NOTIFICATIONS.md.
 
 import { Platform } from 'react-native';
+import { supabase } from '../lib/supabase';
 
 let Notifications = null;
 try {
@@ -130,6 +131,27 @@ export async function scheduleReservationReminders(res) {
     } catch {}
   }
   return ids;
+}
+
+// Enregistre le token push de l'appareil dans Supabase (upsert par token).
+export async function registerPushToken(profile) {
+  if (!Notifications) return;
+  try {
+    const granted = await ensurePermissions();
+    if (!granted) return;
+    const result = await Notifications.getExpoPushTokenAsync();
+    const token = result?.data;
+    if (!token) return;
+    await supabase.from('push_tokens').upsert(
+      {
+        token,
+        prenom: profile?.prenom || '',
+        nom:    profile?.nom    || '',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'token' }
+    );
+  } catch {}
 }
 
 // Annule une liste de rappels.

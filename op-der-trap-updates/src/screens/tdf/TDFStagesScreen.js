@@ -17,7 +17,8 @@ const TYPE_COLOR = {
 
 const EMPTY_PICKS = { p1: '', p2: '', p3: '', combatif: '' };
 
-export default function TDFStagesScreen({ navigation }) {
+export default function TDFStagesScreen({ navigation, route }) {
+  const isAdmin = route?.params?.isAdmin === true;
   const { stageResults, setStageResult, clearStageResult, hasDraw } = useTDF();
   const [modalStage, setModalStage] = useState(null);
   const [picks, setPicks] = useState(EMPTY_PICKS);
@@ -58,11 +59,10 @@ export default function TDFStagesScreen({ navigation }) {
           <Text style={styles.lockIcon}>🎲</Text>
           <Text style={styles.lockTitle}>Tirage requis</Text>
           <Text style={styles.lockSub}>
-            Effectuez d'abord le tirage au sort pour pouvoir saisir les résultats des étapes.
+            {isAdmin
+              ? 'Effectuez le tirage au sort depuis la section TDF du dashboard admin.'
+              : 'Le tirage sera effectué par l\'administrateur. Les résultats des étapes seront visibles ici.'}
           </Text>
-          <TouchableOpacity style={styles.lockBtn} onPress={() => navigation.navigate('TDFDraw')}>
-            <Text style={styles.lockBtnText}>Aller au tirage</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -98,12 +98,16 @@ export default function TDFStagesScreen({ navigation }) {
           const done = !!result;
           const typeColor = TYPE_COLOR[stage.type] || '#888';
 
-          return (
-            <TouchableOpacity
-              style={[styles.stageRow, done && styles.stageRowDone]}
-              onPress={() => openModal(stage)}
-              activeOpacity={0.8}
-            >
+          return React.createElement(
+            isAdmin ? TouchableOpacity : View,
+            isAdmin ? {
+              style: [styles.stageRow, done && styles.stageRowDone],
+              onPress: () => openModal(stage),
+              activeOpacity: 0.8,
+            } : {
+              style: [styles.stageRow, done && styles.stageRowDone],
+            },
+            <>
               <View style={[styles.stageNum, { backgroundColor: done ? '#FFCC00' : '#1A1A2E' }]}>
                 <Text style={[styles.stageNumText, { color: done ? '#1A1A1A' : '#fff' }]}>
                   {stage.num}
@@ -139,31 +143,36 @@ export default function TDFStagesScreen({ navigation }) {
                     })}
                   </View>
                 )}
+                {!done && !isAdmin && (
+                  <Text style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>En attente du résultat</Text>
+                )}
               </View>
-              <Text style={styles.chevron}>{done ? '✏️' : '▶'}</Text>
-            </TouchableOpacity>
+              {isAdmin && <Text style={styles.chevron}>{done ? '✏️' : '▶'}</Text>}
+            </>
           );
         }}
       />
 
-      {/* Stage result modal */}
-      <Modal visible={!!modalStage} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            {modalStage && (
-              <StageResultPicker
-                stage={modalStage}
-                picks={picks}
-                setPicks={setPicks}
-                onSave={saveResult}
-                onClear={() => { clearStageResult(modalStage.id); setModalStage(null); }}
-                onClose={() => setModalStage(null)}
-                hasSaved={!!stageResults[modalStage.id]}
-              />
-            )}
+      {/* Stage result modal — admin only */}
+      {isAdmin && (
+        <Modal visible={!!modalStage} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalSheet}>
+              {modalStage && (
+                <StageResultPicker
+                  stage={modalStage}
+                  picks={picks}
+                  setPicks={setPicks}
+                  onSave={saveResult}
+                  onClear={() => { clearStageResult(modalStage.id); setModalStage(null); }}
+                  onClose={() => setModalStage(null)}
+                  hasSaved={!!stageResults[modalStage.id]}
+                />
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </View>
   );
 }

@@ -93,9 +93,22 @@ export default function TableReservationScreen({ navigation, route }) {
   const [notes, setNotes] = useState(editRes ? (editRes.notes || '') : '');
   const [selectedDay, setSelectedDay] = useState(presetIndex);
   const [selectedTime, setSelectedTime] = useState(editRes ? editRes.time : null);
-  const [guests, setGuests] = useState(editRes && editRes.guests > 0 ? editRes.guests : 2);
   const [quantities, setQuantities] = useState(editRes && editRes.quantities ? editRes.quantities : {}); // { [formuleId]: nombre }
   const [mode, setMode] = useState(editRes ? (editRes.mode || 'place') : 'place'); // 'place' | 'emporter'
+
+  const isWeekend = days[selectedDay]?.day === 'Sam' || days[selectedDay]?.day === 'Dim';
+
+  // On weekends only croque-monsieur is available — clear other selections when switching
+  useEffect(() => {
+    const day = days[selectedDay]?.day;
+    if (day === 'Sam' || day === 'Dim') {
+      setQuantities(q => {
+        const croqueCnt = q['f_croque'] || 0;
+        return croqueCnt > 0 ? { f_croque: croqueCnt } : {};
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDay]);
   const [loading, setLoading] = useState(false);
   const emporter = mode === 'emporter';
 
@@ -132,7 +145,6 @@ export default function TableReservationScreen({ navigation, route }) {
       const ref = isEdit ? editRes.ref : `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
       const notesText = notes.trim() ? `\n📝 ${notes.trim()}` : '';
-      const guestsLine = !emporter && guests > 0 ? `\n👥 ${guests} personne(s)` : '';
       const intro = isEdit
         ? `Bonjour ${prenom} !\n\nVotre réservation a bien été modifiée :`
         : emporter
@@ -140,7 +152,7 @@ export default function TableReservationScreen({ navigation, route }) {
           : `Bonjour ${prenom} !\n\nVotre table est réservée :`;
       const recap = emporter
         ? `${intro}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Commande :\n${itemsText}\n💶 Total : ${totalStr} €\n🥡 À emporter${notesText}\n\nRéférence : ${ref}\n\nÀ tout bientôt !`
-        : `${intro}${guestsLine}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
+        : `${intro}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
       const payload = {
         type: 'table',
         ref,
@@ -151,7 +163,7 @@ export default function TableReservationScreen({ navigation, route }) {
         prenom,
         nom,
         phone,
-        guests: emporter ? 0 : guests,
+        guests: 0,
         mode,
         quantities,
         items: selectedItems.map(f => ({ name: f.name, qty: f.qty })),
@@ -288,9 +300,11 @@ export default function TableReservationScreen({ navigation, route }) {
           <View style={styles.card}>
             <Label icon="restaurant-outline" text="Vos formules *" />
             <Text style={styles.formuleHint}>
-              Choisissez une ou plusieurs formules · ajustez les quantités
+              {isWeekend
+                ? '🥪 Week-end : croque-monsieur uniquement'
+                : 'Choisissez une ou plusieurs formules · ajustez les quantités'}
             </Text>
-            {FORMULES.map(f => {
+            {(isWeekend ? FORMULES.filter(f => f.id === 'f_croque') : FORMULES).map(f => {
               const qty = quantities[f.id] || 0;
               const active = qty > 0;
               return (
@@ -332,31 +346,6 @@ export default function TableReservationScreen({ navigation, route }) {
             )}
           </View>
 
-          {/* Guests (sur place uniquement) */}
-          {!emporter && (
-          <View style={styles.card}>
-            <Label icon="people-outline" text="Nombre de personnes (optionnel)" />
-            <View style={styles.stepperRow}>
-              <TouchableOpacity
-                style={[styles.stepBtn, guests <= 1 && styles.stepBtnDisabled]}
-                onPress={() => setGuests(Math.max(1, guests - 1))}
-                disabled={guests <= 1}
-              >
-                <Ionicons name="remove" size={22} color={guests <= 1 ? '#ccc' : ODT.primary} />
-              </TouchableOpacity>
-              <Text style={styles.stepCount}>{guests}</Text>
-              <TouchableOpacity
-                style={[styles.stepBtn, guests >= 20 && styles.stepBtnDisabled]}
-                onPress={() => setGuests(Math.min(20, guests + 1))}
-                disabled={guests >= 20}
-              >
-                <Ionicons name="add" size={22} color={guests >= 20 ? '#ccc' : ODT.primary} />
-              </TouchableOpacity>
-              <Text style={styles.stepLabel}>personne{guests > 1 ? 's' : ''}</Text>
-            </View>
-          </View>
-          )}
-
           {/* Notes */}
           <View style={styles.card}>
             <Label icon="chatbubble-outline" text="Notes (optionnel)" />
@@ -383,8 +372,7 @@ export default function TableReservationScreen({ navigation, route }) {
           {isValid ? (
             <View style={styles.summaryInfo}>
               <Text style={styles.summaryLine} numberOfLines={1}>
-                📅 {days[selectedDay].label}  ·  ⏰ {selectedTime}
-                {!emporter ? `  ·  👥 ${guests}` : '  ·  🥡'}
+                📅 {days[selectedDay].label}  ·  ⏰ {selectedTime}{emporter ? '  ·  🥡' : ''}
               </Text>
               <Text style={styles.summaryItems} numberOfLines={1}>
                 {totalItems} article{totalItems > 1 ? 's' : ''} · {emporter ? 'à emporter' : 'sur place'}

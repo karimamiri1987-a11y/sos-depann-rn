@@ -11,7 +11,8 @@ import { TDFProvider } from './src/context/TDFContext';
 import { ProfileProvider } from './src/context/ProfileContext';
 import { ReservationsProvider } from './src/context/ReservationsContext';
 import { MenuProvider }         from './src/context/MenuContext';
-import { initNotifications } from './src/utils/notifications';
+import { initNotifications, registerPushToken } from './src/utils/notifications';
+import { useProfile } from './src/context/ProfileContext';
 
 // Op der Trap screens
 import MenuScreen               from './src/screens/opderTrap/MenuScreen';
@@ -57,6 +58,7 @@ function MenuStack() {
       <SMenu.Screen name="Profile"          component={ProfileScreen} />
       <SMenu.Screen name="Reservations"     component={ReservationsScreen} />
       <SMenu.Screen name="Admin"            component={AdminScreen} />
+      <SMenu.Screen name="TDFStages"        component={TDFStagesScreen} />
     </SMenu.Navigator>
   );
 }
@@ -96,9 +98,16 @@ function CarteStack() {
 function AppContent() {
   const insets = useSafeAreaInsets();
   const navigationRef = useRef(null);
+  const { profile } = useProfile();
 
-  // Initialise les notifications (handler + canal Android) au démarrage.
+  // Initialise les notifications et enregistre le token push au démarrage.
   useEffect(() => { initNotifications(); }, []);
+  useEffect(() => {
+    if (profile.prenom || profile.nom || profile.phone) {
+      registerPushToken(profile);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.prenom, profile.nom]);
 
   // Swipe gauche/droite pour changer d'onglet.
   // Le geste doit être nettement horizontal (dx > 3× dy) pour ne pas

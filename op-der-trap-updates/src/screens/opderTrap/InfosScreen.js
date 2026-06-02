@@ -1,17 +1,18 @@
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Image,
+  View, Text, ScrollView, TouchableOpacity,
   StyleSheet, StatusBar, Linking, Platform,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { CAFE_INFO, HORAIRES_SEMAINE } from '../../data/opderTrap/menuDuJour';
 import { getOpenStatus, todayHoursIndex } from '../../utils/openStatus';
 import { ODT } from '../../constants/brand';
 
-const MAP_IMG =
-  `https://staticmap.openstreetmap.de/staticmap.php?center=${CAFE_INFO.lat},${CAFE_INFO.lon}` +
-  `&zoom=15&size=600x320&markers=${CAFE_INFO.lat},${CAFE_INFO.lon},red-pushpin`;
+const MAP_OSM_URL =
+  `https://www.openstreetmap.org/export/embed.html?bbox=5.731,49.829,5.757,49.845` +
+  `&layer=mapnik&marker=${CAFE_INFO.lat},${CAFE_INFO.lon}`;
 
 export default function InfosScreen() {
   const status   = getOpenStatus();
@@ -66,16 +67,23 @@ export default function InfosScreen() {
           </View>
 
           {/* Carte */}
-          <TouchableOpacity style={styles.mapCard} onPress={openMaps} activeOpacity={0.9}>
-            <Image source={{ uri: MAP_IMG }} style={styles.mapImg} resizeMode="cover" />
-            <View style={styles.mapPin}>
-              <Ionicons name="location" size={28} color={ODT.red} />
+          <View style={styles.mapCard}>
+            <View pointerEvents="none" style={styles.mapWebContainer}>
+              <WebView
+                source={{ uri: MAP_OSM_URL }}
+                style={styles.mapImg}
+                scrollEnabled={false}
+                javaScriptEnabled
+                domStorageEnabled={false}
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+              />
             </View>
-            <View style={styles.mapBtn}>
+            <TouchableOpacity style={styles.mapBtn} onPress={openMaps} activeOpacity={0.85}>
               <Ionicons name="navigate" size={16} color="#fff" />
               <Text style={styles.mapBtnText}>Itinéraire</Text>
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
 
           {/* Adresse */}
           <TouchableOpacity style={styles.row} onPress={openMaps} activeOpacity={0.7}>
@@ -91,23 +99,14 @@ export default function InfosScreen() {
             <Ionicons name="chevron-forward" size={18} color={ODT.gray} />
           </TouchableOpacity>
 
-          {/* Contact : téléphone + WhatsApp sur la même ligne */}
-          <View style={styles.contactRow}>
-            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnPhone]} onPress={callPhone} activeOpacity={0.8}>
-              <Ionicons name="call" size={20} color="#fff" />
-              <View>
-                <Text style={styles.contactBtnLabel}>Appeler</Text>
-                <Text style={styles.contactBtnSub}>{CAFE_INFO.tel}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.contactBtn, styles.contactBtnWA]} onPress={openWA} activeOpacity={0.8}>
-              <Text style={styles.waIcon}>💬</Text>
-              <View>
-                <Text style={styles.contactBtnLabel}>WhatsApp</Text>
-                <Text style={styles.contactBtnSub}>Message direct</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          {/* Contact : téléphone */}
+          <TouchableOpacity style={[styles.contactBtn, styles.contactBtnPhone, { marginBottom: 12 }]} onPress={callPhone} activeOpacity={0.8}>
+            <Ionicons name="call" size={20} color="#fff" />
+            <View>
+              <Text style={styles.contactBtnLabel}>Appeler</Text>
+              <Text style={styles.contactBtnSub}>{CAFE_INFO.tel}</Text>
+            </View>
+          </TouchableOpacity>
 
           {/* Email + réseaux (uniquement si configurés) */}
           {hasSocial && (
@@ -203,6 +202,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
+  mapWebContainer: { flex: 1 },
   mapImg: { width: '100%', height: '100%' },
   mapPin: { position: 'absolute', top: '50%', left: '50%', marginLeft: -14, marginTop: -28 },
   mapBtn: {

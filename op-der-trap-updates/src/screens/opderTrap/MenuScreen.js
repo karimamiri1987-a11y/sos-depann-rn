@@ -72,6 +72,22 @@ export default function MenuScreen({ navigation }) {
           </View>
         </View>
 
+        {/* Mes réservations */}
+        <TouchableOpacity
+          style={styles.reservationsBtn}
+          onPress={() => navigation.navigate('Reservations')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="receipt-outline" size={20} color={ODT.primary} />
+          <Text style={styles.reservationsBtnText}>Mes réservations</Text>
+          {activeCount > 0 && (
+            <View style={styles.reservationsBadge}>
+              <Text style={styles.reservationsBadgeText}>{activeCount}</Text>
+            </View>
+          )}
+          <Ionicons name="chevron-forward" size={16} color={ODT.gray} />
+        </TouchableOpacity>
+
         {/* Menu de la semaine */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionIcon}>📅</Text>
@@ -129,42 +145,6 @@ export default function MenuScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Mes réservations */}
-        <TouchableOpacity
-          style={styles.reservationsBtn}
-          onPress={() => navigation.navigate('Reservations')}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="receipt-outline" size={20} color={ODT.primary} />
-          <Text style={styles.reservationsBtnText}>Mes réservations</Text>
-          {activeCount > 0 && (
-            <View style={styles.reservationsBadge}>
-              <Text style={styles.reservationsBadgeText}>{activeCount}</Text>
-            </View>
-          )}
-          <Ionicons name="chevron-forward" size={16} color={ODT.gray} />
-        </TouchableOpacity>
-
-        {/* Reservation CTA */}
-        <TouchableOpacity
-          style={styles.ctaBtn}
-          onPress={() => navigation.navigate('TableReservation')}
-          activeOpacity={0.9}
-        >
-          <LinearGradient
-            colors={[ODT.primary, '#2D5A42']}
-            style={styles.ctaGradient}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          >
-            <Ionicons name="calendar-outline" size={22} color={ODT.gold} />
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={styles.ctaTitle}>Réserver une table</Text>
-              <Text style={styles.ctaSub}>Choisissez votre formule en quelques secondes</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
-          </LinearGradient>
-        </TouchableOpacity>
-
         {/* Carte des desserts */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionIcon}>🍨</Text>
@@ -183,6 +163,26 @@ export default function MenuScreen({ navigation }) {
             <DessertRow key={d.id} item={d} />
           ))}
         </View>
+
+        {/* Réserver une table */}
+        <TouchableOpacity
+          style={styles.ctaBtn}
+          onPress={() => navigation.navigate('TableReservation')}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={[ODT.primary, '#2D5A42']}
+            style={styles.ctaGradient}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+          >
+            <Ionicons name="calendar-outline" size={22} color={ODT.gold} />
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={styles.ctaTitle}>Réserver une table</Text>
+              <Text style={styles.ctaSub}>Choisissez votre formule en quelques secondes</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.6)" />
+          </LinearGradient>
+        </TouchableOpacity>
 
         {/* Footer note */}
         <Text style={styles.footnote}>

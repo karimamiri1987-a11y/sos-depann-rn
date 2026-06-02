@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, Alert, ActivityIndicator,
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
 import { useMenu } from '../../context/MenuContext';
 import { useTDF } from '../../context/TDFContext';
+import { supabase } from '../../lib/supabase';
 
 const PIN_LENGTH = 4;
 
@@ -133,11 +134,12 @@ export default function AdminScreen({ navigation }) {
       {/* Onglets */}
       <View style={styles.tabs}>
         {[
-          { key: 'menu',     label: 'Menu',     icon: 'calendar' },
-          { key: 'formules', label: 'Formules', icon: 'restaurant' },
-          { key: 'events',   label: 'Events',   icon: 'star' },
-          { key: 'tarifs',   label: 'Tarifs',   icon: 'cash' },
-          { key: 'tdf',      label: 'TDF',      icon: 'bicycle' },
+          { key: 'menu',     label: 'Menu',    icon: 'calendar' },
+          { key: 'formules', label: 'Formule', icon: 'restaurant' },
+          { key: 'events',   label: 'Events',  icon: 'star' },
+          { key: 'tarifs',   label: 'Tarifs',  icon: 'cash' },
+          { key: 'tdf',      label: 'TDF',     icon: 'bicycle' },
+          { key: 'notifs',   label: 'Notifs',  icon: 'notifications' },
         ].map(t => (
           <TouchableOpacity
             key={t.key}
@@ -279,8 +281,12 @@ export default function AdminScreen({ navigation }) {
             onRemove={removeTDFParticipant}
             onDraw={handleTDFDraw}
             onReset={handleTDFReset}
+            navigation={navigation}
           />
         )}
+
+        {/* ── NOTIFICATIONS ── */}
+        {section === 'notifs' && <NotificationsSection />}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -406,7 +412,7 @@ function TarifsSection({ tarifBowling, onSaveTarif }) {
   );
 }
 
-function TDFAdminSection({ participants, hasDraw, isComplete, nbRequis, onAdd, onRemove, onDraw, onReset }) {
+function TDFAdminSection({ participants, hasDraw, isComplete, nbRequis, onAdd, onRemove, onDraw, onReset, navigation }) {
   const [tdfName, setTdfName] = useState('');
   const isFull = participants.length >= nbRequis;
   const pct = Math.min(100, Math.round((participants.length / nbRequis) * 100));
@@ -441,13 +447,24 @@ function TDFAdminSection({ participants, hasDraw, isComplete, nbRequis, onAdd, o
       {/* Tirage au sort */}
       {isComplete && (
         <TouchableOpacity
-          style={[styles.saveBtn, { backgroundColor: '#E30613', marginBottom: 16 }]}
+          style={[styles.saveBtn, { backgroundColor: '#E30613', marginBottom: 10 }]}
           onPress={onDraw}
         >
           <Ionicons name="shuffle" size={18} color="#fff" />
           <Text style={styles.saveBtnText}>
             {hasDraw ? '🎲 Refaire le tirage au sort' : '🎲 Faire le tirage au sort'}
           </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Gérer les étapes */}
+      {hasDraw && (
+        <TouchableOpacity
+          style={[styles.saveBtn, { backgroundColor: '#1A1A2E', marginBottom: 16 }]}
+          onPress={() => navigation.navigate('TDFStages', { isAdmin: true })}
+        >
+          <Ionicons name="flag" size={18} color="#FFCC00" />
+          <Text style={styles.saveBtnText}>🏁 Gérer les étapes</Text>
         </TouchableOpacity>
       )}
 
@@ -497,6 +514,149 @@ function TDFAdminSection({ participants, hasDraw, isComplete, nbRequis, onAdd, o
           <Text style={styles.tdfResetBtnText}>Réinitialiser tout (participants + tirage)</Text>
         </TouchableOpacity>
       )}
+    </>
+  );
+}
+
+function NotificationsSection() {
+  const [tokens, setTokens]     = useState([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
+  const [sending, setSending]   = useState(false);
+  const [title, setTitle]       = useState('');
+  const [body, setBody]         = useState('');
+  const [mode, setMode]         = useState('all'); // 'all' | 'select'
+  const [selected, setSelected] = useState(new Set());
+
+  useEffect(() => {
+    setLoadingTokens(true);
+    supabase.from('push_tokens').select('*').order('updated_at', { ascending: false })
+      .then(({ data }) => setTokens(data || []))
+      .catch(() => {})
+      .finally(() => setLoadingTokens(false));
+  }, []);
+
+  const toggleSelect = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const sendNotifs = async () => {
+    if (!title.trim() || !body.trim()) {
+      Alert.alert('Champs manquants', 'Remplissez le titre et le message.');
+      return;
+    }
+    const targets = mode === 'all' ? tokens : tokens.filter(t => selected.has(t.id));
+    if (targets.length === 0) {
+      Alert.alert('Aucun destinataire', 'Sélectionnez au moins un appareil.');
+      return;
+    }
+    setSending(true);
+    try {
+      const messages = targets.map(t => ({
+        to: t.token,
+        title: title.trim(),
+        body: body.trim(),
+        sound: 'default',
+        data: { source: 'admin' },
+      }));
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        body: JSON.stringify(messages),
+      });
+      const json = await res.json();
+      const errors = (json.data || []).filter(d => d.status === 'error');
+      if (errors.length > 0) {
+        Alert.alert('Envoi partiel', `${targets.length - errors.length}/${targets.length} notification(s) envoyée(s).`);
+      } else {
+        Alert.alert('✅ Envoyé', `${targets.length} notification(s) envoyée(s).`);
+        setTitle('');
+        setBody('');
+        setSelected(new Set());
+      }
+    } catch {
+      Alert.alert('Erreur', "L'envoi a échoué. Vérifiez votre connexion.");
+    } finally { setSending(false); }
+  };
+
+  return (
+    <>
+      <Text style={styles.sectionTitle}>🔔 Notifications push</Text>
+      <Text style={styles.sectionHint}>{tokens.length} appareil(s) enregistré(s)</Text>
+
+      {/* Rédaction */}
+      <View style={styles.card}>
+        <FieldRow label="Titre" value={title} onChange={setTitle} />
+        <FieldRow label="Message" value={body} onChange={setBody} multiline />
+      </View>
+
+      {/* Destinataires */}
+      <View style={styles.card}>
+        <Text style={styles.fieldLabel}>Destinataires</Text>
+        <View style={styles.notifModeRow}>
+          <TouchableOpacity
+            style={[styles.notifModeBtn, mode === 'all' && styles.notifModeBtnActive]}
+            onPress={() => setMode('all')}
+          >
+            <Text style={[styles.notifModeTxt, mode === 'all' && styles.notifModeTxtActive]}>
+              Tout le monde
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.notifModeBtn, mode === 'select' && styles.notifModeBtnActive]}
+            onPress={() => setMode('select')}
+          >
+            <Text style={[styles.notifModeTxt, mode === 'select' && styles.notifModeTxtActive]}>
+              Sélectif
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {mode === 'select' && (
+          loadingTokens ? (
+            <ActivityIndicator color={ODT.primary} style={{ marginTop: 12 }} />
+          ) : tokens.length === 0 ? (
+            <Text style={{ color: ODT.gray, fontSize: 13, marginTop: 8 }}>Aucun appareil enregistré</Text>
+          ) : (
+            tokens.map(t => (
+              <TouchableOpacity
+                key={t.id}
+                style={styles.tokenRow}
+                onPress={() => toggleSelect(t.id)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.checkbox, selected.has(t.id) && styles.checkboxChecked]}>
+                  {selected.has(t.id) && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.tokenName}>
+                    {t.prenom || t.nom ? `${t.prenom} ${t.nom}`.trim() : 'Appareil anonyme'}
+                  </Text>
+                  <Text style={styles.tokenSub} numberOfLines={1}>{t.token}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )
+        )}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.saveBtn, { backgroundColor: '#6D28D9' }, sending && { opacity: 0.6 }]}
+        onPress={sendNotifs}
+        disabled={sending}
+      >
+        <Ionicons name="send" size={16} color="#fff" />
+        <Text style={styles.saveBtnText}>
+          {sending ? 'Envoi…' : `Envoyer${mode === 'select' && selected.size > 0 ? ` (${selected.size})` : ''}`}
+        </Text>
+      </TouchableOpacity>
     </>
   );
 }
@@ -600,4 +760,26 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#EF4444', borderRadius: 12,
   },
   tdfResetBtnText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
+
+  // Notifications
+  notifModeRow: { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 },
+  notifModeBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center',
+    borderWidth: 1.5, borderColor: ODT.border, backgroundColor: ODT.cream,
+  },
+  notifModeBtnActive: { backgroundColor: ODT.primary, borderColor: ODT.primary },
+  notifModeTxt: { fontSize: 13, fontWeight: '700', color: ODT.primary },
+  notifModeTxtActive: { color: '#fff' },
+  tokenRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: ODT.border,
+  },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: ODT.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkboxChecked: { backgroundColor: ODT.primary },
+  checkmark: { fontSize: 13, fontWeight: '900', color: '#fff' },
+  tokenName: { fontSize: 13, fontWeight: '700', color: ODT.dark },
+  tokenSub: { fontSize: 10, color: ODT.gray, marginTop: 1 },
 });

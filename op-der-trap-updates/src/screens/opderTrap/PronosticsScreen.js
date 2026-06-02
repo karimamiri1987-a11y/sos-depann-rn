@@ -85,23 +85,6 @@ export default function PronosticsScreen({ navigation }) {
           </TouchableOpacity>
         ))}
 
-        {/* Rules reminder */}
-        <View style={styles.rulesCard}>
-          <Text style={styles.rulesTitle}>📋 Comment ça marche ?</Text>
-          <View style={styles.rulesGrid}>
-            <RuleStep num="1" text="Inscrivez les 23 participants" />
-            <RuleStep num="2" text="Lancez le tirage au sort" />
-            <RuleStep num="3" text="Saisissez les résultats" />
-            <RuleStep num="4" text="Regardez le classement" />
-          </View>
-          <View style={styles.pointsRow}>
-            <PointChip pts="5" label="1er" color="#FFCC00" />
-            <PointChip pts="4" label="Combatif" color="#E30613" light />
-            <PointChip pts="3" label="2ème" color="#C0C0C0" />
-            <PointChip pts="1" label="3ème" color="#CD7F32" />
-          </View>
-        </View>
-
         {/* Coming soon */}
         <Text style={[styles.sectionTitle, { marginTop: 8 }]}>⏳ À venir</Text>
         <View style={styles.comingGrid}>
@@ -121,26 +104,6 @@ export default function PronosticsScreen({ navigation }) {
 
         <View style={{ height: 16 }} />
       </ScrollView>
-    </View>
-  );
-}
-
-function RuleStep({ num, text }) {
-  return (
-    <View style={styles.ruleStep}>
-      <View style={styles.ruleNum}>
-        <Text style={styles.ruleNumText}>{num}</Text>
-      </View>
-      <Text style={styles.ruleText}>{text}</Text>
-    </View>
-  );
-}
-
-function PointChip({ pts, label, color, light }) {
-  return (
-    <View style={[styles.ptChip, { backgroundColor: color }]}>
-      <Text style={[styles.ptVal, light && { color: '#fff' }]}>{pts}pts</Text>
-      <Text style={[styles.ptLabel, light && { color: '#fff' }]}>{label}</Text>
     </View>
   );
 }
