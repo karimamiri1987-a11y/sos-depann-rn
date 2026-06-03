@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, StatusBar, Alert, KeyboardAvoidingView, Platform, Vibration,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { ODT } from '../../constants/brand';
 import { RESOURCE_CONSUMPTION } from '../../constants/stock';
 import { useProfile } from '../../context/ProfileContext';
@@ -109,25 +110,26 @@ export default function TableReservationScreen({ navigation, route }) {
   const [stockCounts, setStockCounts] = useState({}); // { 'YYYY-MM-DD': { resource_id: count } }
   const [loading, setLoading] = useState(false);
 
-  // Charge le stock Supabase pour les 14 prochains jours
-  useEffect(() => {
-    const dateISOs = days.map(d => d.dateISO);
-    supabase
-      .from('reservation_stock')
-      .select('resource_id, date_iso, count')
-      .in('date_iso', dateISOs)
-      .then(({ data }) => {
-        if (!data) return;
-        const counts = {};
-        data.forEach(r => {
-          if (!counts[r.date_iso]) counts[r.date_iso] = {};
-          counts[r.date_iso][r.resource_id] = r.count;
-        });
-        setStockCounts(counts);
-      })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Recharge le stock Supabase à chaque fois que l'écran est affiché
+  useFocusEffect(
+    useCallback(() => {
+      const dateISOs = getNextDays(14).map(d => d.dateISO);
+      supabase
+        .from('reservation_stock')
+        .select('resource_id, date_iso, count')
+        .in('date_iso', dateISOs)
+        .then(({ data }) => {
+          if (!data) return;
+          const counts = {};
+          data.forEach(r => {
+            if (!counts[r.date_iso]) counts[r.date_iso] = {};
+            counts[r.date_iso][r.resource_id] = r.count;
+          });
+          setStockCounts(counts);
+        })
+        .catch(() => {});
+    }, [])
+  );
 
   // Ressources consommées par la sélection en cours (recalcul à chaque render, 5 formules max)
   const currentResourceUsage = (() => {
@@ -220,12 +222,10 @@ export default function TableReservationScreen({ navigation, route }) {
   if (totalItems === 0) missing.push('une formule');
   const missingText = missing.length ? `Il reste à choisir : ${missing.join(', ')}` : '';
 
-  const handleSubmit = () => {
-    if (!isValid) return;
+  const handleSubmit = async () => {
+    if (!isValid || loading) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Vibration.vibrate([0, 80, 60, 120]);
+    try {
       const ref = isEdit ? editRes.ref : `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
       const notesText = notes.trim() ? `\n📝 ${notes.trim()}` : '';
@@ -251,32 +251,54 @@ export default function TableReservationScreen({ navigation, route }) {
         totalStr, notes: notes.trim(),
       };
 
+      // Si édition : libérer l'ancien stock avant de sauvegarder
       if (isEdit) {
-        // Libérer l'ancienne réservation puis enregistrer la nouvelle
         const oldDateISO = editRes.dateISO || editRes.whenISO?.slice(0, 10);
         if (oldDateISO) {
           const oldDelta = computeResourceDelta(editRes.quantities || {});
-          Object.entries(oldDelta).forEach(([res, d]) => {
-            if (d > 0) supabase.rpc('adjust_stock', { p_resource_id: res, p_date_iso: oldDateISO, p_delta: -d }).catch(() => {});
-          });
+          await Promise.all(
+            Object.entries(oldDelta)
+              .filter(([, d]) => d > 0)
+              .map(([res, d]) =>
+                supabase.rpc('adjust_stock', { p_resource_id: res, p_date_iso: oldDateISO, p_delta: -d }).catch(() => {})
+              )
+          );
         }
         updateReservation(editRes.id, payload);
       } else {
         addReservation(payload);
       }
 
-      // Incrémenter le stock pour la nouvelle réservation
+      // Incrémenter le stock de la nouvelle réservation (attendu avant de confirmer)
       const newDelta = computeResourceDelta(quantities);
-      Object.entries(newDelta).forEach(([res, d]) => {
-        if (d > 0) supabase.rpc('adjust_stock', { p_resource_id: res, p_date_iso: newDateISO, p_delta: d }).catch(() => {});
+      await Promise.all(
+        Object.entries(newDelta)
+          .filter(([, d]) => d > 0)
+          .map(([res, d]) =>
+            supabase.rpc('adjust_stock', { p_resource_id: res, p_date_iso: newDateISO, p_delta: d }).catch(() => {})
+          )
+      );
+
+      // Mettre à jour l'état local du stock pour que le COMPLET s'affiche immédiatement
+      setStockCounts(prev => {
+        const next = { ...prev, [newDateISO]: { ...(prev[newDateISO] || {}) } };
+        Object.entries(newDelta).forEach(([res, d]) => {
+          next[newDateISO][res] = (next[newDateISO][res] || 0) + d;
+        });
+        return next;
       });
 
+      setLoading(false);
+      Vibration.vibrate([0, 80, 60, 120]);
       Alert.alert(
         isEdit ? '✅ Réservation modifiée !' : emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
         recap,
         [{ text: 'Parfait !', onPress: () => navigation.goBack() }]
       );
-    }, 1200);
+    } catch {
+      setLoading(false);
+      Alert.alert('Erreur', "Impossible d'enregistrer la réservation. Veuillez réessayer.");
+    }
   };
 
   return (
