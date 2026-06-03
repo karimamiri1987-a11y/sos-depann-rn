@@ -5,26 +5,30 @@ import { supabase } from '../lib/supabase';
 import { RESOURCE_CONSUMPTION } from '../constants/stock';
 
 // Décrémente le stock Supabase (par ressource) quand une réservation est annulée.
+// Entièrement défensif : ne doit JAMAIS lever d'exception (anciennes réservations
+// enregistrées avant le changement de modèle de stock peuvent avoir une forme différente).
 function releaseStock(res) {
-  if (res.type !== 'table' || !res.quantities) return;
-  const dateISO = res.dateISO || res.whenISO?.slice(0, 10);
-  if (!dateISO) return;
-  const delta = {};
-  Object.entries(res.quantities).forEach(([fid, qty]) => {
-    if (!qty) return;
-    Object.entries(RESOURCE_CONSUMPTION[fid] || {}).forEach(([resource, perUnit]) => {
-      delta[resource] = (delta[resource] || 0) + perUnit * qty;
+  try {
+    if (!res || res.type !== 'table' || !res.quantities) return;
+    const dateISO = res.dateISO || res.whenISO?.slice(0, 10);
+    if (!dateISO) return;
+    const delta = {};
+    Object.entries(res.quantities).forEach(([fid, qty]) => {
+      if (!qty) return;
+      Object.entries(RESOURCE_CONSUMPTION[fid] || {}).forEach(([resource, perUnit]) => {
+        delta[resource] = (delta[resource] || 0) + perUnit * qty;
+      });
     });
-  });
-  Object.entries(delta).forEach(([resource, d]) => {
-    if (d > 0) {
-      supabase.rpc('adjust_stock', {
-        p_resource_id: resource,
-        p_date_iso: dateISO,
-        p_delta: -d,
-      }).catch(() => {});
-    }
-  });
+    Object.entries(delta).forEach(([resource, d]) => {
+      if (d > 0) {
+        supabase.rpc('adjust_stock', {
+          p_resource_id: resource,
+          p_date_iso: dateISO,
+          p_delta: -d,
+        }).catch(() => {});
+      }
+    });
+  } catch {}
 }
 
 const ReservationsContext = createContext(null);
@@ -89,8 +93,9 @@ export function ReservationsProvider({ children }) {
 
   const updateReservation = useCallback((id, data) => {
     const existing = resRef.current.find(r => r.id === id);
+    if (!existing) return;
     // Annuler les anciens rappels.
-    if (existing?.notifIds) cancelReminders(existing.notifIds);
+    if (Array.isArray(existing.notifIds)) cancelReminders(existing.notifIds);
 
     const merged = { ...existing, ...data, updatedAt: new Date().toISOString(), notifIds: [] };
     setReservations(prev => {
@@ -106,7 +111,8 @@ export function ReservationsProvider({ children }) {
 
   const cancelReservation = useCallback((id) => {
     const existing = resRef.current.find(r => r.id === id);
-    if (existing?.notifIds) cancelReminders(existing.notifIds);
+    if (!existing) return;
+    if (Array.isArray(existing.notifIds)) cancelReminders(existing.notifIds);
     releaseStock(existing); // libère le stock dans Supabase
     setReservations(prev => {
       const updated = prev.map(r => r.id === id ? { ...r, status: 'cancelled', notifIds: [] } : r);
@@ -117,7 +123,7 @@ export function ReservationsProvider({ children }) {
 
   const deleteReservation = useCallback((id) => {
     const existing = resRef.current.find(r => r.id === id);
-    if (existing?.notifIds) cancelReminders(existing.notifIds);
+    if (existing && Array.isArray(existing.notifIds)) cancelReminders(existing.notifIds);
     setReservations(prev => {
       const updated = prev.filter(r => r.id !== id);
       persist(updated);
