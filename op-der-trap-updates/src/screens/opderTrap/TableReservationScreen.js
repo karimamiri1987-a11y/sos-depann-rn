@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
+import { RESOURCE_CONSUMPTION } from '../../constants/stock';
 import { useProfile } from '../../context/ProfileContext';
 import { useReservations } from '../../context/ReservationsContext';
 import { useMenu } from '../../context/MenuContext';
@@ -39,7 +40,6 @@ function getNextDays(n = 14) {
   return days;
 }
 
-// Combine une date (YYYY-MM-DD) et une heure (HH:MM) en datetime ISO local.
 function computeWhenISO(dateISO, time) {
   if (!dateISO || !time) return null;
   const [hh, mm] = time.split(':').map(Number);
@@ -48,17 +48,27 @@ function computeWhenISO(dateISO, time) {
   return d.toISOString();
 }
 
+// Agrège les ressources consommées par un objet { formuleId: qty }
+function computeResourceDelta(quantitiesObj) {
+  const delta = {};
+  Object.entries(quantitiesObj).forEach(([fid, qty]) => {
+    if (!qty) return;
+    Object.entries(RESOURCE_CONSUMPTION[fid] || {}).forEach(([res, perUnit]) => {
+      delta[res] = (delta[res] || 0) + perUnit * qty;
+    });
+  });
+  return delta;
+}
+
 export default function TableReservationScreen({ navigation, route }) {
   const days = getNextDays(14);
-  const { profile, hasProfile } = useProfile();
+  const { profile } = useProfile();
   const { addReservation, updateReservation } = useReservations();
   const { formules: FORMULES, stockLimits } = useMenu();
 
-  // Réservation à modifier (depuis « Mes réservations »)
   const editRes = route?.params?.edit || null;
   const isEdit = !!editRes;
 
-  // Jour pré-sélectionné : depuis l'édition, sinon depuis le menu (ex. "Mardi")
   const presetDay = route?.params?.dayName;
   const editDayIndex = editRes
     ? Math.max(0, days.findIndex(d => d.label === editRes.dayLabel))
@@ -72,7 +82,6 @@ export default function TableReservationScreen({ navigation, route }) {
   const [prenom, setPrenom] = useState(() => {
     if (!editRes) return profile.prenom;
     if (editRes.prenom) return editRes.prenom;
-    // ancienne réservation : découper le champ « name » sur le 1er espace
     const spaceIdx = (editRes.name || '').indexOf(' ');
     return spaceIdx >= 0 ? editRes.name.slice(0, spaceIdx) : (editRes.name || '');
   });
@@ -84,7 +93,6 @@ export default function TableReservationScreen({ navigation, route }) {
   });
   const [phone, setPhone] = useState(editRes ? editRes.phone : profile.phone);
 
-  // Mise à jour si le profil se charge après le montage (sauf en édition)
   useEffect(() => {
     if (isEdit) return;
     if (profile.prenom && !prenom) setPrenom(profile.prenom);
@@ -92,26 +100,28 @@ export default function TableReservationScreen({ navigation, route }) {
     if (profile.phone && !phone)  setPhone(profile.phone);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
+
   const [notes, setNotes] = useState(editRes ? (editRes.notes || '') : '');
   const [selectedDay, setSelectedDay] = useState(presetIndex);
   const [selectedTime, setSelectedTime] = useState(editRes ? editRes.time : null);
-  const [quantities, setQuantities] = useState(editRes && editRes.quantities ? editRes.quantities : {}); // { [formuleId]: nombre }
-  const [mode, setMode] = useState(editRes ? (editRes.mode || 'place') : 'place'); // 'place' | 'emporter'
-  const [stockCounts, setStockCounts] = useState({}); // { 'YYYY-MM-DD': { formuleId: count } }
+  const [quantities, setQuantities] = useState(editRes?.quantities || {});
+  const [mode, setMode] = useState(editRes ? (editRes.mode || 'place') : 'place');
+  const [stockCounts, setStockCounts] = useState({}); // { 'YYYY-MM-DD': { resource_id: count } }
+  const [loading, setLoading] = useState(false);
 
   // Charge le stock Supabase pour les 14 prochains jours
   useEffect(() => {
     const dateISOs = days.map(d => d.dateISO);
     supabase
       .from('reservation_stock')
-      .select('formule_id, date_iso, count')
+      .select('resource_id, date_iso, count')
       .in('date_iso', dateISOs)
       .then(({ data }) => {
         if (!data) return;
         const counts = {};
         data.forEach(r => {
           if (!counts[r.date_iso]) counts[r.date_iso] = {};
-          counts[r.date_iso][r.formule_id] = r.count;
+          counts[r.date_iso][r.resource_id] = r.count;
         });
         setStockCounts(counts);
       })
@@ -119,24 +129,63 @@ export default function TableReservationScreen({ navigation, route }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Retourne les infos de stock d'une formule pour le jour sélectionné
-  const getStock = (formuleId) => {
+  // Ressources consommées par la sélection en cours (recalcul à chaque render, 5 formules max)
+  const currentResourceUsage = (() => {
+    const usage = {};
+    FORMULES.forEach(f => {
+      const qty = quantities[f.id] || 0;
+      if (!qty) return;
+      Object.entries(RESOURCE_CONSUMPTION[f.id] || {}).forEach(([res, perUnit]) => {
+        usage[res] = (usage[res] || 0) + perUnit * qty;
+      });
+    });
+    return usage;
+  })();
+
+  // Ressources déjà comptabilisées dans la réservation en cours de modification
+  const ownResourceUsage = (() => {
+    if (!isEdit) return {};
+    const usage = {};
+    Object.entries(editRes.quantities || {}).forEach(([fid, qty]) => {
+      if (!qty) return;
+      Object.entries(RESOURCE_CONSUMPTION[fid] || {}).forEach(([res, perUnit]) => {
+        usage[res] = (usage[res] || 0) + perUnit * qty;
+      });
+    });
+    return usage;
+  })();
+
+  // Stock disponible pour une formule : basé sur ses ressources, le jour sélectionné
+  const getFormuleStock = (formuleId) => {
+    const consumed = RESOURCE_CONSUMPTION[formuleId] || {};
+    const entries = Object.entries(consumed);
+    if (!entries.length) return { soldOut: false, remaining: null };
+
     const dateISO = days[selectedDay]?.dateISO;
-    if (!dateISO) return { soldOut: false, remaining: null, max: 0 };
-    // Utilise midi pour éviter les décalages de fuseau horaire
-    const dow = new Date(dateISO + 'T12:00:00').getDay(); // 0=Dim, 1=Lun, ..., 6=Sam
-    const max = stockLimits?.[formuleId]?.[dow] || 0;
-    if (!max) return { soldOut: false, remaining: null, max: 0 };
-    // En édition : la quantité déjà réservée ne compte pas pour la limite affichée
-    const ownQty = isEdit ? (editRes.quantities?.[formuleId] || 0) : 0;
-    const used = Math.max(0, (stockCounts[dateISO]?.[formuleId] || 0) - ownQty);
-    const remaining = Math.max(0, max - used);
-    return { soldOut: remaining === 0, remaining, max };
+    if (!dateISO) return { soldOut: false, remaining: null };
+    const dow = new Date(dateISO + 'T12:00:00').getDay();
+
+    let minCanAdd = Infinity;
+    for (const [res, perUnit] of entries) {
+      const max = stockLimits?.[res]?.[dow] || 0;
+      if (!max) continue; // illimité ce jour-là pour cette ressource
+
+      const dbUsed  = stockCounts[dateISO]?.[res] || 0;
+      const own     = ownResourceUsage[res] || 0;
+      const current = currentResourceUsage[res] || 0;
+      const netUsed = Math.max(0, dbUsed - own) + current;
+      const canAdd  = Math.max(0, Math.floor((max - netUsed) / perUnit));
+      if (canAdd < minCanAdd) minCanAdd = canAdd;
+    }
+
+    return {
+      soldOut:   minCanAdd === 0,
+      remaining: minCanAdd === Infinity ? null : minCanAdd,
+    };
   };
 
   const isWeekend = days[selectedDay]?.day === 'Sam' || days[selectedDay]?.day === 'Dim';
 
-  // On weekends only croque-monsieur is available — clear other selections when switching
   useEffect(() => {
     const day = days[selectedDay]?.day;
     if (day === 'Sam' || day === 'Dim') {
@@ -147,7 +196,7 @@ export default function TableReservationScreen({ navigation, route }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay]);
-  const [loading, setLoading] = useState(false);
+
   const emporter = mode === 'emporter';
 
   const setQty = (id, delta) =>
@@ -165,21 +214,18 @@ export default function TableReservationScreen({ navigation, route }) {
 
   const isValid = prenom.trim() && nom.trim() && phone.trim() && selectedTime && totalItems > 0;
 
-  // Ce qu'il reste à compléter (affiché dans la barre du bas)
   const missing = [];
   if (!prenom.trim() || !nom.trim() || !phone.trim()) missing.push('vos coordonnées');
   if (!selectedTime) missing.push('une heure');
   if (totalItems === 0) missing.push('une formule');
-  const missingText = missing.length
-    ? `Il reste à choisir : ${missing.join(', ')}`
-    : '';
+  const missingText = missing.length ? `Il reste à choisir : ${missing.join(', ')}` : '';
 
   const handleSubmit = () => {
     if (!isValid) return;
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      Vibration.vibrate([0, 80, 60, 120]); // feedback succès
+      Vibration.vibrate([0, 80, 60, 120]);
       const ref = isEdit ? editRes.ref : `ODT-${Math.floor(10000 + Math.random() * 90000)}`;
       const itemsText = selectedItems.map(f => `   ${f.qty}× ${f.name}`).join('\n');
       const notesText = notes.trim() ? `\n📝 ${notes.trim()}` : '';
@@ -193,39 +239,38 @@ export default function TableReservationScreen({ navigation, route }) {
         : `${intro}\n📅 ${days[selectedDay].label}\n⏰ ${selectedTime}\n🍽️ Menus :\n${itemsText}\n💶 Total : ${totalStr} €${notesText}\n\nRéférence : ${ref}\n\nNous vous attendons !`;
       const newDateISO = days[selectedDay].dateISO;
       const payload = {
-        type: 'table',
-        ref,
+        type: 'table', ref,
         dayLabel: days[selectedDay].label,
         dateISO: newDateISO,
         time: selectedTime,
         whenISO: computeWhenISO(newDateISO, selectedTime),
         name: `${prenom} ${nom}`.trim(),
-        prenom,
-        nom,
-        phone,
-        guests: 0,
-        mode,
-        quantities,
+        prenom, nom, phone,
+        guests: 0, mode, quantities,
         items: selectedItems.map(f => ({ name: f.name, qty: f.qty })),
-        totalStr,
-        notes: notes.trim(),
+        totalStr, notes: notes.trim(),
       };
+
       if (isEdit) {
-        // Annuler l'ancien stock, puis appliquer le nouveau
+        // Libérer l'ancienne réservation puis enregistrer la nouvelle
         const oldDateISO = editRes.dateISO || editRes.whenISO?.slice(0, 10);
         if (oldDateISO) {
-          Object.entries(editRes.quantities || {}).forEach(([fid, qty]) => {
-            if (qty > 0) supabase.rpc('adjust_stock', { p_formule_id: fid, p_date_iso: oldDateISO, p_delta: -qty }).catch(() => {});
+          const oldDelta = computeResourceDelta(editRes.quantities || {});
+          Object.entries(oldDelta).forEach(([res, d]) => {
+            if (d > 0) supabase.rpc('adjust_stock', { p_resource_id: res, p_date_iso: oldDateISO, p_delta: -d }).catch(() => {});
           });
         }
         updateReservation(editRes.id, payload);
       } else {
         addReservation(payload);
       }
+
       // Incrémenter le stock pour la nouvelle réservation
-      selectedItems.forEach(item => {
-        supabase.rpc('adjust_stock', { p_formule_id: item.id, p_date_iso: newDateISO, p_delta: item.qty }).catch(() => {});
+      const newDelta = computeResourceDelta(quantities);
+      Object.entries(newDelta).forEach(([res, d]) => {
+        if (d > 0) supabase.rpc('adjust_stock', { p_resource_id: res, p_date_iso: newDateISO, p_delta: d }).catch(() => {});
       });
+
       Alert.alert(
         isEdit ? '✅ Réservation modifiée !' : emporter ? '✅ Commande confirmée !' : '✅ Réservation confirmée !',
         recap,
@@ -238,7 +283,6 @@ export default function TableReservationScreen({ navigation, route }) {
     <View style={{ flex: 1, backgroundColor: ODT.cream }}>
       <StatusBar barStyle="light-content" backgroundColor={ODT.primary} />
 
-      {/* Header */}
       <View style={[styles.header, { backgroundColor: ODT.primary }]}>
         <SafeAreaView edges={['top']}>
           <View style={styles.headerRow}>
@@ -256,59 +300,32 @@ export default function TableReservationScreen({ navigation, route }) {
 
           {/* Mode : sur place / à emporter */}
           <View style={styles.modeRow}>
-            <TouchableOpacity
-              style={[styles.modeBtn, !emporter && styles.modeBtnActive]}
-              onPress={() => setMode('place')}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.modeBtn, !emporter && styles.modeBtnActive]} onPress={() => setMode('place')} activeOpacity={0.8}>
               <Ionicons name="restaurant" size={18} color={!emporter ? '#fff' : ODT.primary} />
               <Text style={[styles.modeText, !emporter && styles.modeTextActive]}>Sur place</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeBtn, emporter && styles.modeBtnActive]}
-              onPress={() => setMode('emporter')}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={[styles.modeBtn, emporter && styles.modeBtnActive]} onPress={() => setMode('emporter')} activeOpacity={0.8}>
               <Ionicons name="bag-handle" size={18} color={emporter ? '#fff' : ODT.primary} />
               <Text style={[styles.modeText, emporter && styles.modeTextActive]}>À emporter</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Nom */}
+          {/* Coordonnées */}
           <View style={styles.card}>
             <Label icon="person-outline" text="Vos coordonnées" />
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.fieldLabel}>Prénom *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={prenom}
-                  onChangeText={setPrenom}
-                  placeholder="Prénom"
-                  maxLength={30}
-                />
+                <TextInput style={styles.input} value={prenom} onChangeText={setPrenom} placeholder="Prénom" maxLength={30} />
               </View>
               <View style={{ width: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.fieldLabel}>Nom *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={nom}
-                  onChangeText={setNom}
-                  placeholder="Nom"
-                  maxLength={30}
-                />
+                <TextInput style={styles.input} value={nom} onChangeText={setNom} placeholder="Nom" maxLength={30} />
               </View>
             </View>
             <Text style={styles.fieldLabel}>Téléphone *</Text>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+32 xxx xx xx xx"
-              keyboardType="phone-pad"
-              maxLength={20}
-            />
+            <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="+352 xxx xx xx xx" keyboardType="phone-pad" maxLength={20} />
           </View>
 
           {/* Date */}
@@ -317,17 +334,9 @@ export default function TableReservationScreen({ navigation, route }) {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.daysRow}>
                 {days.map(d => (
-                  <TouchableOpacity
-                    key={d.id}
-                    style={[styles.dayChip, selectedDay === d.id && styles.dayChipActive]}
-                    onPress={() => setSelectedDay(d.id)}
-                  >
-                    <Text style={[styles.dayShort, selectedDay === d.id && styles.dayShortActive]}>
-                      {d.day}
-                    </Text>
-                    <Text style={[styles.dayNum, selectedDay === d.id && styles.dayNumActive]}>
-                      {d.short}
-                    </Text>
+                  <TouchableOpacity key={d.id} style={[styles.dayChip, selectedDay === d.id && styles.dayChipActive]} onPress={() => setSelectedDay(d.id)}>
+                    <Text style={[styles.dayShort, selectedDay === d.id && styles.dayShortActive]}>{d.day}</Text>
+                    <Text style={[styles.dayNum, selectedDay === d.id && styles.dayNumActive]}>{d.short}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -339,11 +348,7 @@ export default function TableReservationScreen({ navigation, route }) {
             <Label icon="time-outline" text="Heure *" />
             <View style={styles.timeGrid}>
               {TIME_SLOTS.map(t => (
-                <TouchableOpacity
-                  key={t}
-                  style={[styles.timeChip, selectedTime === t && styles.timeChipActive]}
-                  onPress={() => setSelectedTime(t)}
-                >
+                <TouchableOpacity key={t} style={[styles.timeChip, selectedTime === t && styles.timeChipActive]} onPress={() => setSelectedTime(t)}>
                   <Text style={[styles.timeText, selectedTime === t && styles.timeTextActive]}>{t}</Text>
                 </TouchableOpacity>
               ))}
@@ -354,14 +359,12 @@ export default function TableReservationScreen({ navigation, route }) {
           <View style={styles.card}>
             <Label icon="restaurant-outline" text="Vos formules *" />
             <Text style={styles.formuleHint}>
-              {isWeekend
-                ? '🥪 Week-end : croque-monsieur uniquement'
-                : 'Choisissez une ou plusieurs formules · ajustez les quantités'}
+              {isWeekend ? '🥪 Week-end : croque-monsieur uniquement' : 'Choisissez une ou plusieurs formules · ajustez les quantités'}
             </Text>
             {(isWeekend ? FORMULES.filter(f => f.id === 'f_croque') : FORMULES).map(f => {
-              const qty = quantities[f.id] || 0;
-              const active = qty > 0;
-              const stock = getStock(f.id);
+              const qty     = quantities[f.id] || 0;
+              const active  = qty > 0;
+              const stock   = getFormuleStock(f.id);
               const soldOut = stock.soldOut;
               return (
                 <View
@@ -375,31 +378,22 @@ export default function TableReservationScreen({ navigation, route }) {
                     {f.price && (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
                         <Text style={[styles.formulePrice, active && { color: ODT.primary }]}>{f.price}</Text>
-                        {stock.max > 0 && !soldOut && (
-                          <Text style={styles.stockRemaining}>{stock.remaining}/{stock.max} restants</Text>
+                        {stock.remaining !== null && !soldOut && (
+                          <Text style={styles.stockRemaining}>{stock.remaining} restant{stock.remaining > 1 ? 's' : ''}</Text>
                         )}
                       </View>
                     )}
                   </View>
                   <View style={styles.qtyRow}>
-                    <TouchableOpacity
-                      style={[styles.qtyBtn, qty === 0 && styles.qtyBtnDisabled]}
-                      onPress={() => setQty(f.id, -1)}
-                      disabled={qty === 0}
-                    >
+                    <TouchableOpacity style={[styles.qtyBtn, qty === 0 && styles.qtyBtnDisabled]} onPress={() => setQty(f.id, -1)} disabled={qty === 0}>
                       <Ionicons name="remove" size={18} color={qty === 0 ? '#ccc' : ODT.primary} />
                     </TouchableOpacity>
                     <Text style={styles.qtyCount}>{qty}</Text>
-                    <TouchableOpacity
-                      style={[styles.qtyBtn, soldOut && styles.qtyBtnDisabled]}
-                      onPress={() => setQty(f.id, 1)}
-                      disabled={soldOut}
-                    >
+                    <TouchableOpacity style={[styles.qtyBtn, soldOut && styles.qtyBtnDisabled]} onPress={() => setQty(f.id, 1)} disabled={soldOut}>
                       <Ionicons name="add" size={18} color={soldOut ? '#ccc' : ODT.primary} />
                     </TouchableOpacity>
                   </View>
 
-                  {/* Overlay COMPLET */}
                   {soldOut && (
                     <View style={styles.soldOutOverlay} pointerEvents="none">
                       <View style={styles.soldOutBadge}>
@@ -412,9 +406,7 @@ export default function TableReservationScreen({ navigation, route }) {
             })}
             {totalItems > 0 && (
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>
-                  Total · {totalItems} article{totalItems > 1 ? 's' : ''}
-                </Text>
+                <Text style={styles.totalLabel}>Total · {totalItems} article{totalItems > 1 ? 's' : ''}</Text>
                 <Text style={styles.totalValue}>{totalStr} €</Text>
               </View>
             )}
@@ -425,23 +417,17 @@ export default function TableReservationScreen({ navigation, route }) {
             <Label icon="chatbubble-outline" text="Notes (optionnel)" />
             <TextInput
               style={[styles.input, styles.notesInput]}
-              value={notes}
-              onChangeText={setNotes}
+              value={notes} onChangeText={setNotes}
               placeholder="Allergie, occasion spéciale, chaise haute..."
-              multiline
-              numberOfLines={3}
-              maxLength={200}
+              multiline numberOfLines={3} maxLength={200}
             />
           </View>
 
-          <Text style={styles.legalNote}>
-            Réservation gratuite · Annulation possible jusqu'à 2h avant
-          </Text>
-
+          <Text style={styles.legalNote}>Réservation gratuite · Annulation possible jusqu'à 2h avant</Text>
           <View style={{ height: 16 }} />
         </ScrollView>
 
-        {/* Barre récapitulative collée en bas */}
+        {/* Barre récapitulative */}
         <View style={styles.summaryBar}>
           {isValid ? (
             <View style={styles.summaryInfo}>
@@ -454,25 +440,16 @@ export default function TableReservationScreen({ navigation, route }) {
             </View>
           ) : (
             <View style={styles.summaryInfo}>
-              <Text style={styles.summaryMissing} numberOfLines={2}>
-                {missingText}
-              </Text>
+              <Text style={styles.summaryMissing} numberOfLines={2}>{missingText}</Text>
             </View>
           )}
-
           <View style={styles.summaryRight}>
             {totalItems > 0 && <Text style={styles.summaryTotal}>{totalStr} €</Text>}
             <TouchableOpacity
               style={[styles.summaryBtn, (!isValid || loading) && styles.summaryBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={!isValid || loading}
-              activeOpacity={0.85}
+              onPress={handleSubmit} disabled={!isValid || loading} activeOpacity={0.85}
             >
-              <Ionicons
-                name={loading ? 'hourglass-outline' : 'checkmark-circle'}
-                size={18}
-                color="#fff"
-              />
+              <Ionicons name={loading ? 'hourglass-outline' : 'checkmark-circle'} size={18} color="#fff" />
               <Text style={styles.summaryBtnText}>
                 {loading ? 'Envoi...' : isEdit ? 'Enregistrer' : emporter ? 'Commander' : 'Réserver'}
               </Text>
@@ -495,57 +472,30 @@ function Label({ icon, text }) {
 
 const styles = StyleSheet.create({
   header: { paddingBottom: 16 },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10 },
   backBtn: { padding: 4, width: 38 },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: '#fff' },
 
   content: { padding: 16 },
-
   card: {
-    backgroundColor: ODT.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    backgroundColor: ODT.white, borderRadius: 16, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 }, elevation: 3,
   },
-
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   label: { fontSize: 15, fontWeight: '700', color: ODT.dark },
-
   row: { flexDirection: 'row', marginBottom: 12 },
   fieldLabel: { fontSize: 12, color: ODT.gray, fontWeight: '600', marginBottom: 6 },
   input: {
-    backgroundColor: ODT.cream,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 15,
-    color: ODT.dark,
-    borderWidth: 1.5,
-    borderColor: ODT.border,
-    marginBottom: 10,
+    backgroundColor: ODT.cream, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11,
+    fontSize: 15, color: ODT.dark, borderWidth: 1.5, borderColor: ODT.border, marginBottom: 10,
   },
   notesInput: { height: 80, textAlignVertical: 'top', marginBottom: 0 },
 
   daysRow: { flexDirection: 'row', gap: 8, paddingBottom: 4 },
   dayChip: {
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: ODT.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 60,
-    backgroundColor: ODT.lightGray,
+    alignItems: 'center', borderRadius: 12, borderWidth: 1.5, borderColor: ODT.border,
+    paddingHorizontal: 14, paddingVertical: 10, minWidth: 60, backgroundColor: ODT.lightGray,
   },
   dayChipActive: { borderColor: ODT.primary, backgroundColor: ODT.primary },
   dayShort: { fontSize: 10, fontWeight: '700', color: ODT.gray, marginBottom: 2 },
@@ -555,50 +505,21 @@ const styles = StyleSheet.create({
 
   timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   timeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: ODT.border,
-    backgroundColor: ODT.lightGray,
+    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+    borderWidth: 1.5, borderColor: ODT.border, backgroundColor: ODT.lightGray,
   },
   timeChipActive: { borderColor: ODT.primary, backgroundColor: ODT.primary },
   timeText: { fontSize: 14, fontWeight: '700', color: ODT.dark },
   timeTextActive: { color: '#fff' },
 
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  stepBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ODT.lightGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: ODT.border,
-  },
-  stepBtnDisabled: { opacity: 0.4 },
-  stepCount: { fontSize: 28, fontWeight: '900', color: ODT.primary, minWidth: 36, textAlign: 'center' },
-  stepLabel: { fontSize: 15, color: ODT.gray, fontWeight: '600' },
-
   legalNote: { textAlign: 'center', fontSize: 12, color: ODT.gray, fontStyle: 'italic' },
 
-  // Barre récapitulative collée en bas
   summaryBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: ODT.white,
-    borderTopWidth: 1,
-    borderTopColor: ODT.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -3 },
-    elevation: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16,
+    backgroundColor: ODT.white, borderTopWidth: 1, borderTopColor: ODT.border,
+    shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12,
+    shadowOffset: { width: 0, height: -3 }, elevation: 12,
   },
   summaryInfo: { flex: 1 },
   summaryLine: { fontSize: 13, fontWeight: '800', color: ODT.dark },
@@ -607,34 +528,21 @@ const styles = StyleSheet.create({
   summaryRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   summaryTotal: { fontSize: 18, fontWeight: '900', color: ODT.green },
   summaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: ODT.primary,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    shadowColor: ODT.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: ODT.primary, borderRadius: 12, paddingHorizontal: 18, paddingVertical: 12,
+    shadowColor: ODT.primary, shadowOpacity: 0.35, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 }, elevation: 4,
   },
   summaryBtnDisabled: { backgroundColor: '#B8C4BD', shadowOpacity: 0 },
   summaryBtnText: { fontSize: 15, fontWeight: '800', color: '#fff' },
 
   formuleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: ODT.border,
-    backgroundColor: ODT.cream,
-    marginBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 12, borderRadius: 12, borderWidth: 1.5,
+    borderColor: ODT.border, backgroundColor: ODT.cream, marginBottom: 10,
   },
   formuleRowActive: { borderColor: ODT.primary, backgroundColor: '#EAF5EC' },
+  formuleRowSoldOut: { opacity: 0.6, borderColor: '#EF4444' },
   formuleIcon: { fontSize: 24 },
   formuleName: { fontSize: 14, fontWeight: '700', color: ODT.dark, marginBottom: 2 },
   formuleDesc: { fontSize: 12, color: ODT.gray, lineHeight: 16 },
@@ -643,75 +551,38 @@ const styles = StyleSheet.create({
 
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qtyBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: ODT.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: ODT.border,
+    width: 30, height: 30, borderRadius: 15, backgroundColor: ODT.white,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: ODT.border,
   },
   qtyBtnDisabled: { opacity: 0.4 },
   qtyCount: { fontSize: 16, fontWeight: '900', color: ODT.primary, minWidth: 20, textAlign: 'center' },
 
   totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: ODT.border,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 4, paddingTop: 12, borderTopWidth: 1, borderTopColor: ODT.border,
   },
   totalLabel: { fontSize: 14, fontWeight: '700', color: ODT.dark },
   totalValue: { fontSize: 18, fontWeight: '900', color: ODT.green },
 
   modeRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   modeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: ODT.border,
-    backgroundColor: ODT.white,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1.5, borderColor: ODT.border, backgroundColor: ODT.white,
   },
   modeBtnActive: { backgroundColor: ODT.primary, borderColor: ODT.primary },
   modeText: { fontSize: 14, fontWeight: '800', color: ODT.primary },
   modeTextActive: { color: '#fff' },
 
-  formuleRowSoldOut: { opacity: 0.6, borderColor: '#EF4444' },
   soldOutOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', borderRadius: 12,
   },
   soldOutBadge: {
-    borderWidth: 3,
-    borderColor: '#EF4444',
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 4,
-    transform: [{ rotate: '-18deg' }],
+    borderWidth: 3, borderColor: '#EF4444',
+    paddingHorizontal: 10, paddingVertical: 2,
+    borderRadius: 4, transform: [{ rotate: '-18deg' }],
   },
-  soldOutText: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#EF4444',
-    letterSpacing: 4,
-  },
-  stockRemaining: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#D97706',
-  },
+  soldOutText: { fontSize: 20, fontWeight: '900', color: '#EF4444', letterSpacing: 4 },
+  stockRemaining: { fontSize: 11, fontWeight: '700', color: '#D97706' },
 });

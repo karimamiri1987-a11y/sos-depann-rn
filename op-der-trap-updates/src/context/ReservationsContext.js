@@ -2,18 +2,26 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import * as FileSystem from 'expo-file-system/legacy';
 import { scheduleReservationReminders, cancelReminders } from '../utils/notifications';
 import { supabase } from '../lib/supabase';
+import { RESOURCE_CONSUMPTION } from '../constants/stock';
 
-// Décrémente le stock Supabase quand une réservation table est annulée.
+// Décrémente le stock Supabase (par ressource) quand une réservation est annulée.
 function releaseStock(res) {
   if (res.type !== 'table' || !res.quantities) return;
   const dateISO = res.dateISO || res.whenISO?.slice(0, 10);
   if (!dateISO) return;
-  Object.entries(res.quantities).forEach(([formuleId, qty]) => {
-    if (qty > 0) {
+  const delta = {};
+  Object.entries(res.quantities).forEach(([fid, qty]) => {
+    if (!qty) return;
+    Object.entries(RESOURCE_CONSUMPTION[fid] || {}).forEach(([resource, perUnit]) => {
+      delta[resource] = (delta[resource] || 0) + perUnit * qty;
+    });
+  });
+  Object.entries(delta).forEach(([resource, d]) => {
+    if (d > 0) {
       supabase.rpc('adjust_stock', {
-        p_formule_id: formuleId,
+        p_resource_id: resource,
         p_date_iso: dateISO,
-        p_delta: -qty,
+        p_delta: -d,
       }).catch(() => {});
     }
   });

@@ -63,11 +63,11 @@ async function fetchFromSupabase() {
   const settingsMap = {};
   (settings.data || []).forEach(r => { settingsMap[r.key] = r.value; });
 
-  // { [formule_id]: { [day_of_week]: max_count } }
+  // { [resource_id]: { [day_of_week]: max_count } }
   const stockLimits = {};
   (stockLimitsRes.data || []).forEach(r => {
-    if (!stockLimits[r.formule_id]) stockLimits[r.formule_id] = {};
-    stockLimits[r.formule_id][r.day_of_week] = r.max_count;
+    if (!stockLimits[r.resource_id]) stockLimits[r.resource_id] = {};
+    stockLimits[r.resource_id][r.day_of_week] = r.max_count;
   });
 
   const dessertsData = desserts.data || [];

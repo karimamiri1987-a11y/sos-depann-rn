@@ -181,6 +181,17 @@ export default function AdminScreen({ navigation }) {
                 }}
               />
             ))}
+            <StockLimitsSection
+              stockLimits={stockLimits}
+              onSave={async (rows) => {
+                setSaving(true);
+                try {
+                  await adminUpdate('stock_limits', rows);
+                  Alert.alert('✅ Enregistré', 'Stocks mis à jour.');
+                } catch { Alert.alert('Erreur', 'La sauvegarde a échoué.'); }
+                finally { setSaving(false); }
+              }}
+            />
           </>
         )}
 
@@ -193,7 +204,6 @@ export default function AdminScreen({ navigation }) {
               <FormuleCard
                 key={f.id}
                 item={f}
-                stockLimits={stockLimits}
                 onSave={async (updated) => {
                   setSaving(true);
                   try {
@@ -201,13 +211,6 @@ export default function AdminScreen({ navigation }) {
                       id: updated.id, name: updated.name,
                       desc_fr: updated.desc, price: updated.price, icon: updated.icon,
                     });
-                    // Stock par jour de la semaine
-                    const limitsRows = Object.entries(updated.dayLimits).map(([dow, max_count]) => ({
-                      formule_id: updated.id,
-                      day_of_week: parseInt(dow, 10),
-                      max_count,
-                    }));
-                    await adminUpdate('stock_limits', limitsRows);
                     Alert.alert('✅ Enregistré', `${updated.name} mis à jour.`);
                   } catch { Alert.alert('Erreur', 'La sauvegarde a échoué.'); }
                   finally { setSaving(false); }
@@ -332,66 +335,105 @@ function MenuDayCard({ day, onSave }) {
   );
 }
 
-const OPEN_DAYS = [
-  { dow: 2, label: 'Mar' },
-  { dow: 3, label: 'Mer' },
-  { dow: 4, label: 'Jeu' },
-  { dow: 5, label: 'Ven' },
-  { dow: 6, label: 'Sam' },
-  { dow: 0, label: 'Dim' },
-];
-
-function FormuleCard({ item, stockLimits, onSave }) {
+function FormuleCard({ item, onSave }) {
   const [name, setName] = useState(item.name);
   const [desc, setDesc] = useState(item.desc);
   const [price, setPrice] = useState(item.price);
-  const [dayLimits, setDayLimits] = useState(() =>
-    OPEN_DAYS.reduce((acc, { dow }) => ({ ...acc, [dow]: String(stockLimits?.[item.id]?.[dow] || 0) }), {})
-  );
-
-  const origLimits = OPEN_DAYS.reduce((acc, { dow }) => ({ ...acc, [dow]: String(stockLimits?.[item.id]?.[dow] || 0) }), {});
-  const limsDirty = OPEN_DAYS.some(({ dow }) => dayLimits[dow] !== origLimits[dow]);
-  const dirty = name !== item.name || desc !== item.desc || price !== item.price || limsDirty;
-
+  const dirty = name !== item.name || desc !== item.desc || price !== item.price;
   return (
     <View style={styles.card}>
       <Text style={styles.cardIcon}>{item.icon}</Text>
       <FieldRow label="Nom" value={name} onChange={setName} />
       <FieldRow label="Description" value={desc} onChange={setDesc} multiline />
       <FieldRow label="Prix (ex: 15,50 €)" value={price} onChange={setPrice} />
-
-      <Text style={[styles.fieldLabel, { marginBottom: 8, marginTop: 4 }]}>
-        Stock max par jour de semaine (0 = illimité)
-      </Text>
-      <View style={styles.dayLimitsRow}>
-        {OPEN_DAYS.map(({ dow, label }) => (
-          <View key={dow} style={styles.dayLimitCell}>
-            <Text style={styles.dayLimitLabel}>{label}</Text>
-            <TextInput
-              style={styles.dayLimitInput}
-              value={dayLimits[dow]}
-              onChangeText={val => setDayLimits(prev => ({ ...prev, [dow]: val.replace(/[^0-9]/g, '') }))}
-              keyboardType="numeric"
-              maxLength={3}
-              textAlign="center"
-            />
-          </View>
-        ))}
-      </View>
-
       {dirty && (
-        <TouchableOpacity
-          style={styles.saveBtn}
-          onPress={() => onSave({
-            ...item, name, desc, price,
-            dayLimits: OPEN_DAYS.reduce((acc, { dow }) => ({ ...acc, [dow]: parseInt(dayLimits[dow], 10) || 0 }), {}),
-          })}
-        >
+        <TouchableOpacity style={styles.saveBtn} onPress={() => onSave({ ...item, name, desc, price })}>
           <Ionicons name="checkmark-circle" size={16} color="#fff" />
           <Text style={styles.saveBtnText}>Enregistrer</Text>
         </TouchableOpacity>
       )}
     </View>
+  );
+}
+
+// ── Stock par ressource et jour de semaine ────────────────────────────────
+const STOCK_RESOURCES = [
+  { id: 'menu',      label: 'Menu du jour (Entrée + Plat)',  icon: '🍽️', days: [2,3,4,5] },
+  { id: 'spaghetti', label: 'Spaghetti',                     icon: '🍝', days: [2,3,4,5] },
+  { id: 'dessert',   label: 'Dessert du moment',             icon: '🍨', days: [2,3,4,5,6,0] },
+];
+const WEEK_DAYS = [
+  { dow: 2, label: 'Mar' }, { dow: 3, label: 'Mer' },
+  { dow: 4, label: 'Jeu' }, { dow: 5, label: 'Ven' },
+  { dow: 6, label: 'Sam' }, { dow: 0, label: 'Dim' },
+];
+
+function StockLimitsSection({ stockLimits, onSave }) {
+  const [limits, setLimits] = useState(() =>
+    STOCK_RESOURCES.reduce((acc, res) => ({
+      ...acc,
+      [res.id]: WEEK_DAYS.reduce((a, { dow }) => ({ ...a, [dow]: String(stockLimits?.[res.id]?.[dow] || 0) }), {}),
+    }), {})
+  );
+
+  const origLimits = STOCK_RESOURCES.reduce((acc, res) => ({
+    ...acc,
+    [res.id]: WEEK_DAYS.reduce((a, { dow }) => ({ ...a, [dow]: String(stockLimits?.[res.id]?.[dow] || 0) }), {}),
+  }), {});
+
+  const dirty = STOCK_RESOURCES.some(res =>
+    WEEK_DAYS.some(({ dow }) => limits[res.id]?.[dow] !== origLimits[res.id]?.[dow])
+  );
+
+  return (
+    <>
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>📦 Stock disponible par jour</Text>
+      <Text style={styles.sectionHint}>0 = illimité pour ce jour · s'applique à toutes les semaines</Text>
+      {STOCK_RESOURCES.map(res => (
+        <View key={res.id} style={styles.card}>
+          <Text style={styles.cardTitle}>{res.icon} {res.label}</Text>
+          <View style={styles.dayLimitsRow}>
+            {WEEK_DAYS.filter(d => res.days.includes(d.dow)).map(({ dow, label }) => (
+              <View key={dow} style={styles.dayLimitCell}>
+                <Text style={styles.dayLimitLabel}>{label}</Text>
+                <TextInput
+                  style={styles.dayLimitInput}
+                  value={limits[res.id]?.[dow] ?? '0'}
+                  onChangeText={val => setLimits(prev => ({
+                    ...prev,
+                    [res.id]: { ...prev[res.id], [dow]: val.replace(/[^0-9]/g, '') },
+                  }))}
+                  keyboardType="numeric"
+                  maxLength={3}
+                  textAlign="center"
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+      {dirty && (
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={() => {
+            const rows = [];
+            STOCK_RESOURCES.forEach(res => {
+              WEEK_DAYS.filter(d => res.days.includes(d.dow)).forEach(({ dow }) => {
+                rows.push({
+                  resource_id: res.id,
+                  day_of_week: dow,
+                  max_count: parseInt(limits[res.id]?.[dow], 10) || 0,
+                });
+              });
+            });
+            onSave(rows);
+          }}
+        >
+          <Ionicons name="checkmark-circle" size={16} color="#fff" />
+          <Text style={styles.saveBtnText}>Enregistrer les stocks</Text>
+        </TouchableOpacity>
+      )}
+    </>
   );
 }
 
