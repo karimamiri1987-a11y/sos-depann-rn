@@ -4,10 +4,10 @@
     "slug": "op-der-trap",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/ios/AppIcon~ios-marketing.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/ios/AppIcon~ios-marketing.png",
       "resizeMode": "contain",
       "backgroundColor": "#23262B"
     },
@@ -17,8 +17,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#23262B"
+        "foregroundImage": "./assets/android/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "backgroundImage": "./assets/android/res/mipmap-xxxhdpi/ic_launcher_background.png"
       },
       "package": "be.opdertrap.app",
       "versionCode": 1,
@@ -29,7 +29,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/web/favicon.ico",
       "bundler": "metro"
     },
     "platforms": [
@@ -39,7 +39,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
+          "icon": "./assets/ios/AppIcon~ios-marketing.png",
           "color": "#1B3A2D",
           "defaultChannel": "reservations",
           "enableBackgroundRemoteNotifications": false
