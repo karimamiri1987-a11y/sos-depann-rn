@@ -358,77 +358,92 @@ function FormuleCard({ item, onSave }) {
 
 // ── Stock par ressource et jour de semaine ────────────────────────────────
 const STOCK_RESOURCES = [
-  { id: 'menu',      label: 'Menu du jour (Entrée + Plat)',  icon: '🍽️', days: [2,3,4,5] },
-  { id: 'spaghetti', label: 'Spaghetti',                     icon: '🍝', days: [2,3,4,5] },
-  { id: 'dessert',   label: 'Dessert du moment',             icon: '🍨', days: [2,3,4,5,6,0] },
+  { id: 'menu',      label: 'Menu du jour (Entrée + Plat)', icon: '🍽️' },
+  { id: 'spaghetti', label: 'Spaghetti',                    icon: '🍝' },
+  { id: 'dessert',   label: 'Dessert du moment',            icon: '🍨' },
 ];
-const WEEK_DAYS = [
-  { dow: 2, label: 'Mar' }, { dow: 3, label: 'Mer' },
-  { dow: 4, label: 'Jeu' }, { dow: 5, label: 'Ven' },
-  { dow: 6, label: 'Sam' }, { dow: 0, label: 'Dim' },
+const STOCK_DAYS = [
+  { dow: 2, label: 'Mardi' },
+  { dow: 3, label: 'Mercredi' },
+  { dow: 4, label: 'Jeudi' },
+  { dow: 5, label: 'Vendredi' },
 ];
 
 function StockLimitsSection({ stockLimits, onSave }) {
-  const [limits, setLimits] = useState(() =>
-    STOCK_RESOURCES.reduce((acc, res) => ({
-      ...acc,
-      [res.id]: WEEK_DAYS.reduce((a, { dow }) => ({ ...a, [dow]: String(stockLimits?.[res.id]?.[dow] || 0) }), {}),
-    }), {})
+  const [limits, setLimits] = useState(() => {
+    const init = {};
+    STOCK_DAYS.forEach(({ dow }) => {
+      init[dow] = {};
+      STOCK_RESOURCES.forEach(res => {
+        init[dow][res.id] = stockLimits?.[res.id]?.[dow] ?? 0;
+      });
+    });
+    return init;
+  });
+
+  const setQty = (dow, resId, delta) =>
+    setLimits(prev => ({
+      ...prev,
+      [dow]: { ...prev[dow], [resId]: Math.max(0, (prev[dow][resId] || 0) + delta) },
+    }));
+
+  const dirty = STOCK_DAYS.some(({ dow }) =>
+    STOCK_RESOURCES.some(res => limits[dow][res.id] !== (stockLimits?.[res.id]?.[dow] ?? 0))
   );
 
-  const origLimits = STOCK_RESOURCES.reduce((acc, res) => ({
-    ...acc,
-    [res.id]: WEEK_DAYS.reduce((a, { dow }) => ({ ...a, [dow]: String(stockLimits?.[res.id]?.[dow] || 0) }), {}),
-  }), {});
-
-  const dirty = STOCK_RESOURCES.some(res =>
-    WEEK_DAYS.some(({ dow }) => limits[res.id]?.[dow] !== origLimits[res.id]?.[dow])
-  );
+  const handleSave = () => {
+    const rows = [];
+    STOCK_DAYS.forEach(({ dow }) => {
+      STOCK_RESOURCES.forEach(res => {
+        rows.push({ resource_id: res.id, day_of_week: dow, max_count: limits[dow][res.id] });
+      });
+    });
+    onSave(rows);
+  };
 
   return (
     <>
       <Text style={[styles.sectionTitle, { marginTop: 20 }]}>📦 Stock disponible par jour</Text>
-      <Text style={styles.sectionHint}>0 = illimité pour ce jour · s'applique à toutes les semaines</Text>
-      {STOCK_RESOURCES.map(res => (
-        <View key={res.id} style={styles.card}>
-          <Text style={styles.cardTitle}>{res.icon} {res.label}</Text>
-          <View style={styles.dayLimitsRow}>
-            {WEEK_DAYS.filter(d => res.days.includes(d.dow)).map(({ dow, label }) => (
-              <View key={dow} style={styles.dayLimitCell}>
-                <Text style={styles.dayLimitLabel}>{label}</Text>
-                <TextInput
-                  style={styles.dayLimitInput}
-                  value={limits[res.id]?.[dow] ?? '0'}
-                  onChangeText={val => setLimits(prev => ({
-                    ...prev,
-                    [res.id]: { ...prev[res.id], [dow]: val.replace(/[^0-9]/g, '') },
-                  }))}
-                  keyboardType="numeric"
-                  maxLength={3}
-                  textAlign="center"
-                />
+      <Text style={styles.sectionHint}>0 = COMPLET dès l'ouverture · s'applique à toutes les semaines</Text>
+      {STOCK_DAYS.map(({ dow, label }) => (
+        <View key={dow} style={styles.card}>
+          <Text style={styles.stockDayTitle}>{label}</Text>
+          {STOCK_RESOURCES.map((res, i) => {
+            const qty = limits[dow]?.[res.id] ?? 0;
+            const isComplet = qty === 0;
+            return (
+              <View
+                key={res.id}
+                style={[styles.stockResRow, i === STOCK_RESOURCES.length - 1 && { borderBottomWidth: 0 }]}
+              >
+                <Text style={styles.stockResIcon}>{res.icon}</Text>
+                <Text style={styles.stockResLabel} numberOfLines={2}>{res.label}</Text>
+                <View style={styles.stockStepper}>
+                  <TouchableOpacity
+                    style={[styles.stockBtn, isComplet && styles.stockBtnDisabled]}
+                    onPress={() => setQty(dow, res.id, -1)}
+                    disabled={isComplet}
+                  >
+                    <Ionicons name="remove" size={14} color={isComplet ? '#ccc' : ODT.primary} />
+                  </TouchableOpacity>
+                  {isComplet ? (
+                    <View style={styles.completBadge}>
+                      <Text style={styles.completText}>COMPLET</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.stockQtyText}>{qty}</Text>
+                  )}
+                  <TouchableOpacity style={styles.stockBtn} onPress={() => setQty(dow, res.id, 1)}>
+                    <Ionicons name="add" size={14} color={ODT.primary} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            ))}
-          </View>
+            );
+          })}
         </View>
       ))}
       {dirty && (
-        <TouchableOpacity
-          style={styles.saveBtn}
-          onPress={() => {
-            const rows = [];
-            STOCK_RESOURCES.forEach(res => {
-              WEEK_DAYS.filter(d => res.days.includes(d.dow)).forEach(({ dow }) => {
-                rows.push({
-                  resource_id: res.id,
-                  day_of_week: dow,
-                  max_count: parseInt(limits[res.id]?.[dow], 10) || 0,
-                });
-              });
-            });
-            onSave(rows);
-          }}
-        >
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
           <Ionicons name="checkmark-circle" size={16} color="#fff" />
           <Text style={styles.saveBtnText}>Enregistrer les stocks</Text>
         </TouchableOpacity>
@@ -854,14 +869,27 @@ const styles = StyleSheet.create({
   },
   tdfResetBtnText: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
 
-  // Limites de stock par jour
-  dayLimitsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  dayLimitCell: { alignItems: 'center' },
-  dayLimitLabel: { fontSize: 10, fontWeight: '700', color: ODT.gray, marginBottom: 4 },
-  dayLimitInput: {
-    width: 48, backgroundColor: ODT.cream, borderRadius: 8, paddingVertical: 8,
-    fontSize: 14, color: ODT.dark, borderWidth: 1.5, borderColor: ODT.border,
+  // Stock par jour — steppers
+  stockDayTitle: { fontSize: 15, fontWeight: '800', color: ODT.dark, marginBottom: 4 },
+  stockResRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: ODT.border,
   },
+  stockResIcon: { fontSize: 18, width: 26 },
+  stockResLabel: { flex: 1, fontSize: 12, fontWeight: '600', color: ODT.dark },
+  stockStepper: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stockBtn: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: ODT.lightGray,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: ODT.border,
+  },
+  stockBtnDisabled: { opacity: 0.3 },
+  stockQtyText: { fontSize: 16, fontWeight: '800', color: ODT.primary, minWidth: 32, textAlign: 'center' },
+  completBadge: {
+    backgroundColor: '#FEF2F2', borderRadius: 6,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderWidth: 1, borderColor: '#FECACA', minWidth: 62, alignItems: 'center',
+  },
+  completText: { fontSize: 10, fontWeight: '800', color: '#EF4444', letterSpacing: 1 },
 
   // Notifications
   notifModeRow: { flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 },

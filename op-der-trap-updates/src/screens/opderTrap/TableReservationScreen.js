@@ -169,8 +169,11 @@ export default function TableReservationScreen({ navigation, route }) {
 
     let minCanAdd = Infinity;
     for (const [res, perUnit] of entries) {
-      const max = stockLimits?.[res]?.[dow] || 0;
-      if (!max) continue; // illimité ce jour-là pour cette ressource
+      const max = stockLimits?.[res]?.[dow];
+      // pas de ligne en base → pas de limite configurée → illimité
+      if (max === undefined || max === null) continue;
+      // max = 0 → admin a explicitement mis COMPLET pour ce jour
+      if (max === 0) { minCanAdd = 0; break; }
 
       const dbUsed  = stockCounts[dateISO]?.[res] || 0;
       const own     = ownResourceUsage[res] || 0;
