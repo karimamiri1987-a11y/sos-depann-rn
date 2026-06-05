@@ -272,6 +272,14 @@ export default function TableReservationScreen({ navigation, route }) {
         addReservation(payload);
       }
 
+      // Enregistrer / mettre à jour le client dans Supabase
+      supabase.rpc('upsert_client', {
+        p_phone: phone.trim(),
+        p_prenom: prenom.trim(),
+        p_nom: nom.trim(),
+        p_email: profile.email || '',
+      }).catch(() => {});
+
       // Incrémenter le stock de la nouvelle réservation (attendu avant de confirmer)
       const newDelta = computeResourceDelta(quantities);
       await Promise.all(

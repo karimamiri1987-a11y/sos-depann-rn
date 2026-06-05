@@ -27,7 +27,7 @@ export default function AdminScreen({ navigation }) {
 
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState('');
-  const [section, setSection] = useState('menu'); // menu | formules | events | tarifs | tdf
+  const [section, setSection] = useState('menu'); // menu | formules | events | tarifs | tdf | notifs | clients
   const [saving, setSaving] = useState(false);
 
   const handleTDFDraw = () => {
@@ -142,6 +142,7 @@ export default function AdminScreen({ navigation }) {
           { key: 'tarifs',   label: 'Tarifs',  icon: 'cash' },
           { key: 'tdf',      label: 'TDF',     icon: 'bicycle' },
           { key: 'notifs',   label: 'Notifs',  icon: 'notifications' },
+          { key: 'clients',  label: 'Clients', icon: 'people' },
         ].map(t => (
           <TouchableOpacity
             key={t.key}
@@ -300,6 +301,9 @@ export default function AdminScreen({ navigation }) {
 
         {/* ── NOTIFICATIONS ── */}
         {section === 'notifs' && <NotificationsSection />}
+
+        {/* ── CLIENTS ── */}
+        {section === 'clients' && <ClientsSection />}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -803,6 +807,82 @@ function NotificationsSection() {
   );
 }
 
+function ClientsSection() {
+  const [clients, setClients] = useState([]);
+  const [loadingClients, setLoadingClients] = useState(false);
+
+  const loadClients = () => {
+    setLoadingClients(true);
+    supabase.from('clients').select('*').order('last_seen_at', { ascending: false })
+      .then(({ data }) => setClients(data || []))
+      .catch(() => {})
+      .finally(() => setLoadingClients(false));
+  };
+
+  useEffect(() => { loadClients(); }, []);
+
+  return (
+    <>
+      <Text style={styles.sectionTitle}>👥 Clients enregistrés</Text>
+      <Text style={styles.sectionHint}>
+        {clients.length} client(s) · mis à jour automatiquement à chaque réservation
+      </Text>
+
+      <TouchableOpacity
+        style={[styles.saveBtn, { backgroundColor: '#0891B2', marginBottom: 14 }, loadingClients && { opacity: 0.6 }]}
+        onPress={loadClients}
+        disabled={loadingClients}
+      >
+        <Ionicons name="refresh" size={16} color="#fff" />
+        <Text style={styles.saveBtnText}>{loadingClients ? 'Chargement…' : 'Actualiser'}</Text>
+      </TouchableOpacity>
+
+      {loadingClients ? (
+        <ActivityIndicator color={ODT.primary} style={{ marginTop: 20 }} />
+      ) : clients.length === 0 ? (
+        <View style={[styles.card, { alignItems: 'center', paddingVertical: 30 }]}>
+          <Ionicons name="people-outline" size={40} color={ODT.border} />
+          <Text style={{ color: ODT.gray, fontSize: 14, fontWeight: '700', marginTop: 12 }}>Aucun client pour l'instant</Text>
+          <Text style={{ color: ODT.gray, fontSize: 12, textAlign: 'center', marginTop: 4, lineHeight: 18 }}>
+            Les clients apparaissent dès leur première réservation.
+          </Text>
+        </View>
+      ) : (
+        clients.map(c => (
+          <View key={c.id} style={styles.card}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <View style={styles.clientAvatar}>
+                <Text style={styles.clientAvatarText}>
+                  {c.prenom?.[0]?.toUpperCase() || '?'}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.clientName}>{[c.prenom, c.nom].filter(Boolean).join(' ') || 'Anonyme'}</Text>
+                <Text style={styles.clientBadge}>
+                  {c.nb_reservations} réservation{c.nb_reservations > 1 ? 's' : ''}
+                </Text>
+              </View>
+              <Text style={styles.clientDate}>
+                {new Date(c.last_seen_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+              </Text>
+            </View>
+            <View style={styles.clientDetailRow}>
+              <Ionicons name="call-outline" size={12} color={ODT.gray} />
+              <Text style={styles.clientDetailText}>{c.phone}</Text>
+            </View>
+            {!!c.email && (
+              <View style={styles.clientDetailRow}>
+                <Ionicons name="mail-outline" size={12} color={ODT.gray} />
+                <Text style={styles.clientDetailText}>{c.email}</Text>
+              </View>
+            )}
+          </View>
+        ))
+      )}
+    </>
+  );
+}
+
 function FieldRow({ label, value, onChange, multiline, keyboardType }) {
   return (
     <View style={styles.fieldRow}>
@@ -946,4 +1026,16 @@ const styles = StyleSheet.create({
   checkmark: { fontSize: 13, fontWeight: '900', color: '#fff' },
   tokenName: { fontSize: 13, fontWeight: '700', color: ODT.dark },
   tokenSub: { fontSize: 10, color: ODT.gray, marginTop: 1 },
+
+  // Clients
+  clientAvatar: {
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: ODT.primary, alignItems: 'center', justifyContent: 'center',
+  },
+  clientAvatarText: { fontSize: 18, fontWeight: '900', color: '#fff' },
+  clientName: { fontSize: 15, fontWeight: '800', color: ODT.dark },
+  clientBadge: { fontSize: 11, color: ODT.gray, fontWeight: '600', marginTop: 1 },
+  clientDate: { fontSize: 11, color: ODT.gray, fontWeight: '600' },
+  clientDetailRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  clientDetailText: { fontSize: 12, color: ODT.gray },
 });

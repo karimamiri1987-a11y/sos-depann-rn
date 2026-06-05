@@ -10,6 +10,7 @@ import { ODT } from '../../constants/brand';
 import { useProfile } from '../../context/ProfileContext';
 import { useReservations } from '../../context/ReservationsContext';
 import { useMenu } from '../../context/MenuContext';
+import { supabase } from '../../lib/supabase';
 
 const CYAN = '#0891B2';
 
@@ -84,12 +85,10 @@ export default function BowlingReservationScreen({ navigation, route }) {
   const missingText = missing.length ? `Il reste à choisir : ${missing.join(', ')}` : '';
   const total = players * tarifBowling * (duration === '1h' ? 1 : duration === '1h30' ? 1.5 : duration === '2h' ? 2 : 3);
 
-  const handleSubmit = () => {
-    if (!isValid) return;
+  const handleSubmit = async () => {
+    if (!isValid || loading) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Vibration.vibrate([0, 80, 60, 120]);
+    try {
       const ref = isEdit ? editRes.ref : `BOW-${Math.floor(10000 + Math.random() * 90000)}`;
       const payload = {
         type: 'bowling',
@@ -105,12 +104,26 @@ export default function BowlingReservationScreen({ navigation, route }) {
       };
       if (isEdit) updateReservation(editRes.id, payload);
       else addReservation(payload);
+
+      // Enregistrer / mettre à jour le client dans Supabase
+      supabase.rpc('upsert_client', {
+        p_phone: phone.trim(),
+        p_prenom: nom.trim(),
+        p_nom: '',
+        p_email: profile.email || '',
+      }).catch(() => {});
+
+      setLoading(false);
+      Vibration.vibrate([0, 80, 60, 120]);
       Alert.alert(
         isEdit ? '🎳 Réservation modifiée !' : '🎳 Réservation bowling confirmée !',
         `Bonjour ${nom} !\n\n📅 ${days[selectedDay].label} à ${selectedTime}\n👥 ${players} joueur(s)\n⏱️ ${duration}\n💶 ~${total.toFixed(0)}€ estimé\n\nRéférence : ${ref}\n\nÀ vos quilles !`,
         [{ text: 'Super !', onPress: () => navigation.goBack() }]
       );
-    }, 1200);
+    } catch {
+      setLoading(false);
+      Alert.alert('Erreur', "Impossible d'enregistrer la réservation.");
+    }
   };
 
   return (
