@@ -170,3 +170,11 @@ export async function cancelReminders(ids) {
     } catch {}
   }
 }
+
+// Annule TOUTES les notifications locales programmées (utilisé quand l'utilisateur désactive les notifs).
+export async function cancelAllNotifications() {
+  if (!Notifications) return;
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {}
+}

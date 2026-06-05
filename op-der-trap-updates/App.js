@@ -103,16 +103,20 @@ function AppContent() {
   // Initialise les notifications et enregistre le token push au démarrage.
   useEffect(() => {
     initNotifications();
-    registerPushToken(profile); // premier enregistrement (profil peut être vide)
+    // notifEnabled vaut true par défaut → demande permission automatiquement au 1er lancement
+    if (profile.notifEnabled !== false) {
+      registerPushToken(profile);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Re-enregistre quand le profil est rempli pour associer le nom au token
   useEffect(() => {
+    if (profile.notifEnabled === false) return;
     if (profile.prenom || profile.nom || profile.phone) {
       registerPushToken(profile);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.prenom, profile.nom]);
+  }, [profile.prenom, profile.nom, profile.notifEnabled]);
 
   // Swipe gauche/droite pour changer d'onglet.
   // Le geste doit être nettement horizontal (dx > 3× dy) pour ne pas

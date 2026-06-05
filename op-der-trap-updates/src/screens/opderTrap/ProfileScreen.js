@@ -1,35 +1,55 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
+  View, Text, TextInput, TouchableOpacity, ScrollView, Switch,
   StyleSheet, StatusBar, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useProfile } from '../../context/ProfileContext';
 import { ODT } from '../../constants/brand';
+import { registerPushToken, cancelAllNotifications } from '../../utils/notifications';
 
 export default function ProfileScreen({ navigation }) {
   const { profile, saveProfile } = useProfile();
-  const [prenom, setPrenom] = useState(profile.prenom);
-  const [nom, setNom]       = useState(profile.nom);
-  const [phone, setPhone]   = useState(profile.phone);
-  const [email, setEmail]   = useState(profile.email);
-  const [saved, setSaved]   = useState(false);
+  const [prenom, setPrenom]           = useState(profile.prenom);
+  const [nom, setNom]                 = useState(profile.nom);
+  const [phone, setPhone]             = useState(profile.phone);
+  const [email, setEmail]             = useState(profile.email);
+  const [notifEnabled, setNotifEnabled] = useState(profile.notifEnabled !== false);
+  const [saved, setSaved]             = useState(false);
 
   useEffect(() => {
     setPrenom(profile.prenom);
     setNom(profile.nom);
     setPhone(profile.phone);
     setEmail(profile.email);
+    setNotifEnabled(profile.notifEnabled !== false);
   }, [profile]);
 
-  const isValid = prenom.trim().length > 0 && phone.trim().length > 0;
+  const isValid =
+    prenom.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    email.trim().length > 0;
 
   const handleSave = async () => {
     if (!isValid) return;
-    await saveProfile({ prenom: prenom.trim(), nom: nom.trim(), phone: phone.trim(), email: email.trim() });
+    await saveProfile({
+      prenom: prenom.trim(), nom: nom.trim(),
+      phone: phone.trim(), email: email.trim(),
+      notifEnabled,
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleNotifToggle = async (value) => {
+    setNotifEnabled(value);
+    await saveProfile({ ...profile, notifEnabled: value });
+    if (value) {
+      registerPushToken({ ...profile, notifEnabled: true });
+    } else {
+      await cancelAllNotifications();
+    }
   };
 
   const handleReset = () => {
@@ -39,8 +59,8 @@ export default function ProfileScreen({ navigation }) {
       [
         { text: 'Annuler', style: 'cancel' },
         { text: 'Effacer', style: 'destructive', onPress: () => {
-            saveProfile({ prenom: '', nom: '', phone: '', email: '' });
-            setPrenom(''); setNom(''); setPhone(''); setEmail('');
+            saveProfile({ prenom: '', nom: '', phone: '', email: '', notifEnabled: true });
+            setPrenom(''); setNom(''); setPhone(''); setEmail(''); setNotifEnabled(true);
           }},
       ]
     );
@@ -77,7 +97,7 @@ export default function ProfileScreen({ navigation }) {
             </Text>
           </View>
 
-          {/* Champs */}
+          {/* Coordonnées */}
           <View style={styles.card}>
             <Field
               label="Prénom *"
@@ -107,7 +127,7 @@ export default function ProfileScreen({ navigation }) {
             />
             <Separator />
             <Field
-              label="E-mail"
+              label="E-mail *"
               icon="mail-outline"
               value={email}
               onChangeText={setEmail}
@@ -115,6 +135,33 @@ export default function ProfileScreen({ navigation }) {
               keyboardType="email-address"
               autoCapitalize="none"
             />
+          </View>
+
+          {/* Notifications */}
+          <View style={styles.card}>
+            <View style={styles.notifRow}>
+              <View style={[styles.fieldIcon, { backgroundColor: notifEnabled ? '#EAF5EC' : '#F3F4F6' }]}>
+                <Ionicons
+                  name={notifEnabled ? 'notifications' : 'notifications-off-outline'}
+                  size={18}
+                  color={notifEnabled ? ODT.primary : ODT.gray}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.notifLabel}>Notifications</Text>
+                <Text style={styles.notifSub}>
+                  {notifEnabled
+                    ? 'Rappels de réservation et infos du café activés'
+                    : 'Désactivées — pas de rappels ni de messages'}
+                </Text>
+              </View>
+              <Switch
+                value={notifEnabled}
+                onValueChange={handleNotifToggle}
+                trackColor={{ false: ODT.border, true: ODT.primary }}
+                thumbColor="#fff"
+              />
+            </View>
           </View>
 
           {/* Boutons */}
@@ -140,7 +187,7 @@ export default function ProfileScreen({ navigation }) {
           )}
 
           <Text style={styles.hint}>
-            * Champs obligatoires pour utiliser la pré-saisie automatique.
+            * Prénom, téléphone et e-mail sont obligatoires.
           </Text>
 
           <TouchableOpacity
@@ -223,6 +270,10 @@ const styles = StyleSheet.create({
   fieldLabel: { fontSize: 11, color: ODT.gray, fontWeight: '700', marginBottom: 3 },
   fieldInput: { fontSize: 15, color: ODT.dark, fontWeight: '600', paddingVertical: 0 },
   sep: { height: 1, backgroundColor: ODT.border, marginLeft: 66 },
+
+  notifRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
+  notifLabel: { fontSize: 15, fontWeight: '700', color: ODT.dark, marginBottom: 2 },
+  notifSub: { fontSize: 11, color: ODT.gray, lineHeight: 15 },
 
   saveBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

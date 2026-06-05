@@ -2,6 +2,7 @@
   "expo": {
     "name": "Op der Trap",
     "slug": "op-der-trap",
+    "owner": "creappsolution",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/ios/AppIcon~ios-marketing.png",
@@ -35,6 +36,11 @@
     "platforms": [
       "android"
     ],
+    "extra": {
+      "eas": {
+        "projectId": "73e31631-8a6e-4aac-a4c4-e7b44e2c4163"
+      }
+    },
     "plugins": [
       [
         "expo-notifications",

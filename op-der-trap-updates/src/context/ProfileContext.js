@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 const ProfileContext = createContext();
 const FILE_URI = FileSystem.documentDirectory + 'profile.json';
 
-const EMPTY = { prenom: '', nom: '', phone: '', email: '' };
+const EMPTY = { prenom: '', nom: '', phone: '', email: '', notifEnabled: true };
 
 export function ProfileProvider({ children }) {
   const [profile, setProfile] = useState(EMPTY);
