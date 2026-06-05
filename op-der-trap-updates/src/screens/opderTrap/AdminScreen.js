@@ -7,8 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ODT } from '../../constants/brand';
 import { useMenu } from '../../context/MenuContext';
+import { useProfile } from '../../context/ProfileContext';
 import { useTDF } from '../../context/TDFContext';
 import { supabase } from '../../lib/supabase';
+import { registerPushToken } from '../../utils/notifications';
 
 const PIN_LENGTH = 4;
 
@@ -626,21 +628,41 @@ function TDFAdminSection({ participants, hasDraw, isComplete, nbRequis, onAdd, o
 }
 
 function NotificationsSection() {
+  const { profile } = useProfile();
   const [tokens, setTokens]     = useState([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
   const [sending, setSending]   = useState(false);
+  const [registering, setRegistering] = useState(false);
   const [title, setTitle]       = useState('');
   const [body, setBody]         = useState('');
   const [mode, setMode]         = useState('all'); // 'all' | 'select'
   const [selected, setSelected] = useState({});    // { [id]: true }
 
-  useEffect(() => {
+  const loadTokens = () => {
     setLoadingTokens(true);
     supabase.from('push_tokens').select('*').order('updated_at', { ascending: false })
       .then(({ data }) => setTokens(data || []))
       .catch(() => {})
       .finally(() => setLoadingTokens(false));
-  }, []);
+  };
+
+  useEffect(() => { loadTokens(); }, []);
+
+  // Bouton diagnostic : tente d'enregistrer CET appareil et affiche le vrai résultat
+  const registerThisDevice = async () => {
+    setRegistering(true);
+    try {
+      const result = await registerPushToken({ ...profile, notifEnabled: true });
+      if (result?.ok) {
+        Alert.alert('✅ Appareil enregistré', 'Cet appareil peut maintenant recevoir des notifications.');
+        loadTokens();
+      } else {
+        Alert.alert('⚠️ Échec de l\'enregistrement', result?.reason || 'Raison inconnue.');
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
 
   const toggleSelect = (id) => {
     setSelected(prev =>
@@ -698,6 +720,18 @@ function NotificationsSection() {
     <>
       <Text style={styles.sectionTitle}>🔔 Notifications push</Text>
       <Text style={styles.sectionHint}>{tokens.length} appareil(s) enregistré(s)</Text>
+
+      {/* Diagnostic : enregistrer cet appareil + voir l'erreur éventuelle */}
+      <TouchableOpacity
+        style={[styles.saveBtn, { backgroundColor: '#0891B2', marginBottom: 14 }, registering && { opacity: 0.6 }]}
+        onPress={registerThisDevice}
+        disabled={registering}
+      >
+        <Ionicons name="phone-portrait-outline" size={16} color="#fff" />
+        <Text style={styles.saveBtnText}>
+          {registering ? 'Enregistrement…' : 'Enregistrer / tester cet appareil'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Rédaction */}
       <View style={styles.card}>

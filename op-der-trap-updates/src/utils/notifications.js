@@ -22,6 +22,15 @@ try {
   Notifications = null;
 }
 
+// expo-device est optionnel : s'il n'est pas installé, on suppose un vrai appareil.
+let Device = { isDevice: true };
+try {
+  // eslint-disable-next-line global-require
+  Device = require('expo-device');
+} catch {
+  Device = { isDevice: true };
+}
+
 let handlerSet = false;
 
 export function isAvailable() {
@@ -135,30 +144,49 @@ export async function scheduleReservationReminders(res) {
 }
 
 // Enregistre le token push de l'appareil dans Supabase (upsert par token).
+// Renvoie un objet { ok, reason, token } pour permettre un diagnostic clair.
 export async function registerPushToken(profile) {
-  if (!Notifications) return;
+  if (!Notifications) {
+    return { ok: false, reason: 'Module expo-notifications introuvable (Expo Go ?).' };
+  }
   try {
+    if (!Device?.isDevice) {
+      // Sur émulateur, pas de token push possible
+      return { ok: false, reason: 'Les notifications push nécessitent un vrai téléphone (pas un émulateur).' };
+    }
     const granted = await ensurePermissions();
-    if (!granted) return;
+    if (!granted) {
+      return { ok: false, reason: 'Permission notifications refusée. Activez-la dans les réglages Android.' };
+    }
     // Expo SDK 53+ exige le projectId — on le lit depuis la config EAS injectée au build
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ??
       Constants.easConfig?.projectId;
-    const result = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : {}
-    );
+    if (!projectId) {
+      return { ok: false, reason: "projectId Expo manquant dans app.json (extra.eas.projectId)." };
+    }
+    const result = await Notifications.getExpoPushTokenAsync({ projectId });
     const token = result?.data;
-    if (!token) return;
-    await supabase.from('push_tokens').upsert(
+    if (!token) {
+      return { ok: false, reason: 'Aucun token retourné par Expo.' };
+    }
+    const { error } = await supabase.from('push_tokens').upsert(
       {
         token,
         prenom: profile?.prenom || '',
         nom:    profile?.nom    || '',
+        email:  profile?.email  || '',
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'token' }
     );
-  } catch {}
+    if (error) {
+      return { ok: false, reason: 'Erreur Supabase : ' + error.message, token };
+    }
+    return { ok: true, token };
+  } catch (e) {
+    return { ok: false, reason: (e?.message || String(e)) };
+  }
 }
 
 // Annule une liste de rappels.
