@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Op der Trap",
+    "slug": "op-der-trap",
+    "owner": "creappsolution",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/ios/AppIcon~ios-marketing.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/ios/AppIcon~ios-marketing.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#23262B"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "be.opdertrap.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+        "backgroundImage": "./assets/android/res/mipmap-xxxhdpi/ic_launcher_background.png"
+      },
+      "package": "be.opdertrap.app",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/web/favicon.ico",
+      "bundler": "metro"
+    },
+    "platforms": [
+      "android"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "73e31631-8a6e-4aac-a4c4-e7b44e2c4163"
+      }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/ios/AppIcon~ios-marketing.png",
+          "color": "#1B3A2D",
+          "defaultChannel": "reservations",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ]
+    ]
+  }
+}
